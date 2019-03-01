@@ -114,13 +114,13 @@ class USPS(data.Dataset):
         return images, labels
 
 
-def get_usps(train):
+def get_usps(path, train):
     """Get USPS dataset loader."""
-    # image pre-processing
+    # image pre-processing -- Shrink the scale from [0, 255] to [0, 1]
     pre_process = transforms.Compose([transforms.ToTensor()])
 
     # dataset and data loader
-    usps_dataset = USPS(root=params.data_root,
+    usps_dataset = USPS(root=path,
                         train=train,
                         transform=pre_process,
                         download=True)

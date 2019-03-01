@@ -1,18 +1,15 @@
 import numpy as np
 import torch
 import sys
-from torchvision.datasets import MNIST, CIFAR10
+import os
+from torchvision.datasets import MNIST
 from torch.autograd import Variable
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchvision import transforms as tfs
-from torchvision.utils import save_image
 from torch import nn
-from usps import USPS, get_usps
-#from usps16 import USPS16, get_usps
+from src.usps import get_usps
 from torch.nn import init
 from copy import deepcopy
-
-import matplotlib.pyplot as plt
 
 
 # MNIST -- toy net
@@ -52,42 +49,6 @@ class BasicAE(nn.Module):
         rec = self.decoder(code)
 
         return code, rec
-
-
-class BasicAE2(nn.Module):
-
-    def __init__(self):
-        super(BasicAE2, self).__init__()
-
-        # Encoder Structure
-        self.encoder = nn.Sequential(
-            nn.Linear(16 * 16, 256),
-            nn.LeakyReLU(True),
-            nn.Linear(256, 64),
-            nn.LeakyReLU(True),
-            nn.Linear(64, 16),
-            nn.LeakyReLU(True),
-            nn.Linear(16, 8)
-        )
-
-        # Decoder Structure
-        self.decoder = nn.Sequential(
-            nn.Linear(8, 16),
-            nn.LeakyReLU(True),
-            nn.Linear(16, 64),
-            nn.LeakyReLU(True),
-            nn.Linear(64, 256),
-            nn.LeakyReLU(True),
-            nn.Linear(256, 16 * 16),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        code = self.encoder(x)
-        rec = self.decoder(code)
-
-        return code, rec
-
 
 # CIFAR10
 class BasicAE3(nn.Module):
@@ -185,9 +146,9 @@ class Discriminator(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(8, 16),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(16, 32),
+            nn.Linear(16, 16),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(32, 1),
+            nn.Linear(16, 1),
             nn.Sigmoid()
         )
 
@@ -210,20 +171,23 @@ im_tfs = tfs.Compose([
 
 
 def main(load_model=False):
+
+    root_path = os.getcwd()
+
     # Get source domain data
-    train_set = MNIST('./data/mnist', transform=im_tfs, download=True)
+    train_set = MNIST(root_path + '/data/mnist', transform=im_tfs, download=True)
     train_data = DataLoader(train_set, batch_size=128, shuffle=True)
 
     # Get target domain data
-    target_train_data = get_usps(True)
+    target_train_data = get_usps(root_path + '/data', True)
 
     # Models for source domain
     source_ae = BasicAE()
     source_clf = Classifier()
     if load_model:
-        source_ae.load_state_dict(torch.load('./modeinfo/source_ae.pt'))
+        source_ae.load_state_dict(torch.load(root_path + '/modeinfo/source_ae.pt'))
         source_ae.eval()
-        source_clf.load_state_dict(torch.load('./modeinfo/source_clf.pt'))
+        source_clf.load_state_dict(torch.load(root_path + '/modeinfo/source_clf.pt'))
         source_clf.eval()
 
 
@@ -283,8 +247,8 @@ def main(load_model=False):
                   .format(step, ae_loss / len(train_data), clf_loss / len(train_data),
                           train_acc / len(train_data)))
 
-        torch.save(source_ae.state_dict(), './modeinfo/source_ae.pt')
-        torch.save(source_clf.state_dict(), './modeinfo/source_clf.pt')
+        torch.save(source_ae.state_dict(), root_path + '/modeinfo/source_ae.pt')
+        torch.save(source_clf.state_dict(), root_path + '/modeinfo/source_clf.pt')
 
     # Models for target domain
     target_ae = deepcopy(source_ae)  # Copy from Source AE

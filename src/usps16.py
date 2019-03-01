@@ -42,7 +42,7 @@ class USPS16(data.Dataset):
         # label = torch.FloatTensor([label.item()])
         return img, label
 
-def get_usps(train):
+def get_usps(path, train):
     """Get USPS dataset loader."""
     # image pre-processing
     pre_process = transforms.Compose([transforms.ToTensor(),
@@ -51,7 +51,7 @@ def get_usps(train):
                                           [.5, .5, .5])])
 
     # dataset and data loader
-    usps_dataset = USPS16('/Users/alanlin/DomainAdaptation/data/usps.h5',
+    usps_dataset = USPS16(path,
                         train=train,
                         transform=pre_process)
 
