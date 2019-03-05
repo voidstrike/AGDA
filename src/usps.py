@@ -12,9 +12,9 @@ import urllib
 import numpy as np
 import torch
 import torch.utils.data as data
-from torchvision import datasets, transforms
+from torchvision import transforms
 
-import params
+from src import params
 
 
 class USPS(data.Dataset):
@@ -72,7 +72,8 @@ class USPS(data.Dataset):
         img, label = self.train_data[index, ::], self.train_labels[index]
         if self.transform is not None:
             img = self.transform(img)
-        label = torch.LongTensor([np.int64(label).item()])
+        # label = torch.LongTensor([np.int64(label).item()])
+        label = np.int64(label).item()
         # label = torch.FloatTensor([label.item()])
         return img, label
 
@@ -111,6 +112,7 @@ class USPS(data.Dataset):
             images = data_set[1][0]
             labels = data_set[1][1]
             self.dataset_size = labels.shape[0]
+
         return images, labels
 
 

@@ -2,160 +2,29 @@ import numpy as np
 import torch
 import sys
 import os
+from src.LinearAE import LinearAE
+from src.ConvAE import ConvAE
+from src.FCNN import LinearClf, Discriminator
 from torchvision.datasets import MNIST
 from torch.autograd import Variable
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchvision import transforms as tfs
 from torch import nn
 from src.usps import get_usps
-from torch.nn import init
+from src import params
 from copy import deepcopy
 
 
-# MNIST -- toy net
-class BasicAE(nn.Module):
-    def __init__(self):
-        super(BasicAE, self).__init__()
+def setPartialTrainable(target_model, num_layer):
+    # Train only part of the model
+    if num_layer != 0:
+        ct = 0
+        for eachLayer in target_model.encoder:
+            if isinstance(eachLayer, torch.nn.Linear) and ct < num_layer:
+                eachLayer.requires_grad = False
+                ct += 1
+    return target_model
 
-        # Encoder Structure
-        self.encoder = nn.Sequential(
-            nn.Linear(28 * 28, 256),
-            nn.LeakyReLU(True),
-            nn.Linear(256, 64),
-            nn.LeakyReLU(True),
-            nn.Linear(64, 16),
-            nn.LeakyReLU(True),
-            nn.Linear(16, 8)
-        )
-
-        # Decoder Structure
-        self.decoder = nn.Sequential(
-            nn.Linear(8, 16),
-            nn.LeakyReLU(True),
-            nn.Linear(16, 64),
-            nn.LeakyReLU(True),
-            nn.Linear(64, 256),
-            nn.LeakyReLU(True),
-            nn.Linear(256, 28 * 28),
-            nn.Sigmoid()
-        )
-
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                init.xavier_uniform_(module.weight)
-
-    def forward(self, x):
-        code = self.encoder(x)
-        rec = self.decoder(code)
-
-        return code, rec
-
-# CIFAR10
-class BasicAE3(nn.Module):
-    def __init__(self):
-        super(BasicAE3, self).__init__()
-
-        # Encoder Structure
-        self.encoder = nn.Sequential(
-            nn.Linear(32 * 32 * 3, 512),
-            nn.LeakyReLU(True),
-            nn.Linear(512, 256),
-            nn.LeakyReLU(True),
-            nn.Linear(256, 128),
-            nn.LeakyReLU(True),
-            nn.Linear(128, 64)
-        )
-
-        # Decoder Structure
-        self.decoder = nn.Sequential(
-            nn.Linear(64, 128),
-            nn.LeakyReLU(True),
-            nn.Linear(128, 256),
-            nn.LeakyReLU(True),
-            nn.Linear(256, 512),
-            nn.LeakyReLU(True),
-            nn.Linear(512, 32 * 32 * 3),
-            nn.Tanh()
-        )
-
-    def forward(self, x):
-        code = self.encoder(x)
-        rec = self.decoder(code)
-
-        return code, rec
-
-
-class ConvAE(nn.Module):
-    def __init__(self):
-        super(ConvAE, self).__init__()
-
-        # Encoder Network
-        # Output Shape = (Original_Shape - Kernel + 2 * Padding) / Stride
-        self.encoder = nn.Sequential(
-            nn.Conv2d(1, 16, 3, stride=3, padding=1),  # (b, 16, 10, 10)
-            nn.ReLU(True),
-            nn.MaxPool2d(2, stride=2),  # (b, 16, 5, 5)
-            nn.Conv2d(16, 8, 3, stride=2, padding=1),  # (b, 8, 3, 3)
-            nn.ReLU(True),
-            nn.MaxPool2d(2, stride=1)  # (b, 8, 2, 2)
-        )
-
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(8, 16, 3, stride=2),  # (b, 16, 5, 5)
-            nn.ReLU(True),
-            nn.ConvTranspose2d(16, 8, 5, stride=3, padding=1),  # (b, 8, 15, 15)
-            nn.ReLU(True),
-            nn.ConvTranspose2d(8, 1, 2, stride=2, padding=1),  # (b, 1, 28, 28)
-            nn.Tanh()
-        )
-
-    def forward(self, x):
-        code = self.encoder(x)
-        rec = self.decoder(code)
-        return code, rec
-
-
-class Classifier(nn.Module):
-    def __init__(self):
-        super(Classifier, self).__init__()
-
-        # Create Sequential Model
-        self.model = nn.Sequential(
-            nn.Linear(8, 16),
-            nn.LeakyReLU(),
-            nn.Linear(16, 32),
-            nn.LeakyReLU(),
-            nn.Linear(32, 16),
-            nn.LeakyReLU(),
-            nn.Linear(16, 10)
-        )
-
-        # Initialize the weight via Xavier
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                init.xavier_uniform_(module.weight)
-
-    def forward(self, x):
-        return self.model(x)
-
-#  GAN - Discriminator
-class Discriminator(nn.Module):
-    def __init__(self):
-        super(Discriminator, self).__init__()
-
-        self.model = nn.Sequential(
-            nn.Linear(8, 16),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(16, 16),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(16, 1),
-            nn.Sigmoid()
-        )
-
-    def forward(self, img):
-        validity = self.model(img)
-
-        return validity
 
 
 def to_img(x):
@@ -168,45 +37,41 @@ im_tfs = tfs.Compose([
     tfs.ToTensor()
 ])
 
-
-
 def main(load_model=False):
 
     root_path = os.getcwd()
 
     # Get source domain data
     train_set = MNIST(root_path + '/data/mnist', transform=im_tfs, download=True)
-    train_data = DataLoader(train_set, batch_size=128, shuffle=True)
+    train_data = DataLoader(train_set, batch_size=params.batch_size, shuffle=True)
 
     # Get target domain data
     target_train_data = get_usps(root_path + '/data', True)
 
     # Models for source domain
-    source_ae = BasicAE()
-    source_clf = Classifier()
+    # source_ae = BasicAE()
+    source_ae = LinearAE((28*28, 256, 64, 16, 8), None)  # Generate source AE
+    source_clf = LinearClf()
+
     if load_model:
         source_ae.load_state_dict(torch.load(root_path + '/modeinfo/source_ae.pt'))
         source_ae.eval()
         source_clf.load_state_dict(torch.load(root_path + '/modeinfo/source_clf.pt'))
         source_clf.eval()
 
+    criterion_ae = nn.MSELoss(reduction='sum')      # General Loss of AE -- sum MSE
+    criterion_clf = nn.CrossEntropyLoss()           # General Loss of classifier -- CEL
+    criterion_gan = nn.BCELoss()                    # Auxiliary loss for GAN (Discriminator)
 
-
-    criterion_ae = nn.MSELoss(reduction='sum')  # General loss for AE -- sum MSE
-    criterion_clf = nn.CrossEntropyLoss()  # General Loss for classifier -- CEL
-    criterion_gan = nn.BCELoss()           # Auxiliary loss for GAN
-
-    optimizer = torch.optim.Adam(list(source_ae.parameters()) + list(source_clf.parameters()), lr=1e-3)
-
-    # optimizer = torch.optim.Adam(source_ae.parameters(), lr=1e-3)
+    sae_opt = torch.optim.Adam(list(source_ae.parameters()) + list(source_clf.parameters()), lr=1e-3)
 
     if torch.cuda.is_available():
         source_ae = source_ae.cuda()
         source_clf = source_clf.cuda()
 
     if not load_model:
-        # Train the AutoEncoder and Classifier for source domain if not loaded
-        for step in range(200):
+        # Train AE & CLF from scratch
+        for step in range(params.clf_train_iter):
             ae_loss = 0.0
             clf_loss = 0.0
             train_acc = 0.0
@@ -214,14 +79,10 @@ def main(load_model=False):
             for features, label in train_data:
                 if torch.cuda.is_available():
                     features = Variable(features.view(features.shape[0], -1).cuda())
-                    # Used USPS
-                    # label = label.squeeze(1)
                     label = Variable(label.cuda())
 
                 else:
                     features = Variable(features.view(features.shape[0], -1))
-                    # Used USPS
-                    # label = label.squeeze(1)
                     label = Variable(label)
 
                 source_code, source_rec = source_ae(features)
@@ -231,9 +92,9 @@ def main(load_model=False):
                 loss_clf = criterion_clf(label_pred, label)
                 floss = loss_ae + loss_clf
 
-                optimizer.zero_grad()
+                sae_opt.zero_grad()
                 floss.backward()
-                optimizer.step()
+                sae_opt.step()
 
                 ae_loss += loss_ae.item()
                 clf_loss += loss_clf.item()
@@ -252,14 +113,9 @@ def main(load_model=False):
 
     # Models for target domain
     target_ae = deepcopy(source_ae)  # Copy from Source AE
+    setPartialTrainable(target_ae, 2)
+    # target_ae = LinearAE((28*28, 256, 64, 16, 8), None)
     target_dis = Discriminator()
-
-    #  Disable part of the AE
-    i = 0
-    for eachLayer in target_ae.encoder:
-        if isinstance(eachLayer, torch.nn.Linear) and i < 2:
-            eachLayer.requires_grad = False
-            i += 1
 
     optimizer_G = torch.optim.Adam(target_ae.parameters(), lr=1e-4)
     optimizer_D = torch.optim.Adam(target_dis.parameters(), lr=1e-3)
@@ -275,18 +131,16 @@ def main(load_model=False):
         fake_placeholder = fake_placeholder.cuda()
 
     # Train target AE and Discriminator
-    for step in range(1000):
+    for step in range(params.tag_train_iter):
         #  Train discriminator
         for features, label in target_train_data:
             if features.shape[0] != 128:
                 continue
             if torch.cuda.is_available():
                 features = Variable(features.view(features.shape[0], -1).cuda())
-                label = label.squeeze(1)
                 label = Variable(label.cuda())
             else:
                 features = Variable(features.view(features.shape[0], -1))
-                label = label.squeeze(1)
                 label = Variable(label)
 
             # Sample for source domain -- Real Image
@@ -330,13 +184,11 @@ def main(load_model=False):
         for features, label in target_train_data:
             if torch.cuda.is_available():
                 features = Variable(features.view(features.shape[0], -1).cuda())
-                label = label.squeeze(1)
                 label = Variable(label.cuda())
                 valid_placeholder = valid_placeholder.cuda()
                 fake_placeholder = fake_placeholder.cuda()
             else:
                 features = Variable(features.view(features.shape[0], -1))
-                label = label.squeeze(1)
                 label = Variable(label)
 
             target_code, target_rec = target_ae(features)

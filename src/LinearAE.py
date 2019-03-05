@@ -27,7 +27,7 @@ class LinearAE(nn.Module):
 
     def __generateEncoder(self, encoder_set, activation):
         layer_set = []
-        for i in range(len(encoder_set) - 1):
+        for i in range(len(encoder_set) - 2):
             layer_set.append(nn.Linear(encoder_set[i], encoder_set[i+1]))
             if activation == 'LeakyReLU':
                 layer_set.append(nn.LeakyReLU(True))
@@ -39,9 +39,9 @@ class LinearAE(nn.Module):
     def __generateDecoder(self, decoder_set, activation, rescale, flag=False):
         layer_set = []
         if flag:
-            decoder_set.reverse()
+            decoder_set = decoder_set[::-1]
 
-        for i in range(len(decoder_set) - 1):
+        for i in range(len(decoder_set) - 2):
             layer_set.append(nn.Linear(decoder_set[i], decoder_set[i + 1]))
             if activation == 'LeakyReLU':
                 layer_set.append(nn.LeakyReLU(True))
@@ -64,3 +64,14 @@ class LinearAE(nn.Module):
         code = self.encoder(x)
         rec = self.decoder(code)
         return code, rec
+
+
+def main():
+    # Test code for this class
+    source_ae = LinearAE((28*28, 256, 64, 16, 8), None)
+    for layer in source_ae.modules():
+        print(layer)
+
+
+if __name__ == '__main__':
+    main()
