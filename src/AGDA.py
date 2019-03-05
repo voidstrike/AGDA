@@ -19,10 +19,16 @@ def setPartialTrainable(target_model, num_layer):
     # Train only part of the model
     if num_layer != 0:
         ct = 0
-        for eachLayer in target_model.encoder:
-            if isinstance(eachLayer, torch.nn.Linear) and ct < num_layer:
-                eachLayer.requires_grad = False
-                ct += 1
+        if isinstance(target_model, LinearAE):
+            for eachLayer in target_model.encoder:
+                if isinstance(eachLayer, torch.nn.Linear) and ct < num_layer:
+                    eachLayer.requires_grad = False
+                    ct += 1
+        elif isinstance(target_model, ConvAE):
+            for eachLayer in target_model.encoder:
+                if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
+                    eachLayer.requires_grad = False
+                    ct += 1
     return target_model
 
 
@@ -56,9 +62,9 @@ def main(load_model=False):
     source_clf = LinearClf()
 
     if load_model:
-        source_ae.load_state_dict(torch.load(root_path + '/modeinfo/source_ae.pt'))
+        source_ae.load_state_dict(torch.load(root_path + '/../modeinfo/source_ae.pt'))
         source_ae.eval()
-        source_clf.load_state_dict(torch.load(root_path + '/modeinfo/source_clf.pt'))
+        source_clf.load_state_dict(torch.load(root_path + '/../modeinfo/source_clf.pt'))
         source_clf.eval()
 
     criterion_ae = nn.MSELoss(reduction='sum')      # General Loss of AE -- sum MSE
@@ -121,7 +127,7 @@ def main(load_model=False):
 
     # Models for target domain
     target_ae = deepcopy(source_ae)  # Copy from Source AE
-    setPartialTrainable(target_ae, 2)
+    setPartialTrainable(target_ae, params.num_disable_layer)
     # target_ae = LinearAE((28*28, 256, 64, 16, 8), None)
     target_dis = Discriminator()
 
