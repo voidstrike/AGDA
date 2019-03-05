@@ -17,3 +17,5 @@ tgt_model_trained = True
 # params for model training
 clf_train_iter = 1
 tag_train_iter = 1
+
+fusion_size = 128

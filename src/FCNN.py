@@ -9,11 +9,11 @@ class LinearClf(nn.Module):
 
         # Create Sequential Model
         self.model = nn.Sequential(
-            nn.Linear(8, 16),
+            nn.Linear(32, 20),
             nn.LeakyReLU(),
-            nn.Linear(16, 32),
+            nn.Linear(20, 16),
             nn.LeakyReLU(),
-            nn.Linear(32, 16),
+            nn.Linear(16, 16),
             nn.LeakyReLU(),
             nn.Linear(16, 10)
         )
@@ -33,7 +33,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
 
         self.model = nn.Sequential(
-            nn.Linear(8, 16),
+            nn.Linear(32, 16),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(16, 16),
             nn.LeakyReLU(0.2, inplace=True),
