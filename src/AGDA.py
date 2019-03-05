@@ -141,30 +141,23 @@ def main(load_model=False):
 
     # Train target AE and Discriminator
     for step in range(params.tag_train_iter):
-        #  Train discriminator
         for features, _ in target_train_data:
+            # Initial Setting for each iteration
             if features.shape[0] != params.fusion_size:
-                continue
+                continue  # Drop this block due to size mismatch
+
             if torch.cuda.is_available():
                 features = Variable(features.view(features.shape[0], -1).cuda())
             else:
                 features = Variable(features.view(features.shape[0], -1))
 
-            # Sample for source domain -- Real Image
+            # Sample data from source domain
             t_key = np.random.randint(train_data_fusion.__len__() - 1)
             sampler = SubsetRandomSampler(list(range(t_key * params.fusion_size, (t_key + 1) * params.fusion_size)))
             real_loader = DataLoader(train_set, sampler=sampler, shuffle=False, batch_size=params.fusion_size)
 
-            if isinstance(target_ae, ConvAE):
-                target_code, target_rec = target_ae(features.view(-1, 1, 28, 28))
-                target_code = target_code.flatten(start_dim=1)
-                target_rec = target_rec.view(-1, 28 * 28)
-            else:
-                target_code, target_rec = target_ae(features)
-
             real_code = None
             for s_feature, _ in real_loader:
-                # s_feature = torch.reshape(s_feature, (-1, 28 * 28))
                 if torch.cuda.is_available():
                     s_feature = s_feature.cuda()
 
@@ -174,33 +167,47 @@ def main(load_model=False):
                 else:
                     real_code, _ = source_ae(s_feature)
 
-            # print(real_code.shape)
-            optimizer_D.zero_grad()
-            dis_res_real_code = target_dis(real_code)
-            if isinstance(target_ae, ConvAE):
-                tmp, _ = target_ae(features.view(-1, 1, 28, 28))
-                tmp = tmp.flatten(start_dim=1)
-            else:
-                tmp, _ = target_ae(features)
+            assert real_code is not None
 
-            dis_res_fake_code = target_dis(tmp)
-            real_loss = criterion_gan(dis_res_real_code, valid_placeholder_fusion)
-            fake_loss = criterion_gan(dis_res_fake_code, fake_placeholder_fusion)
-            d_loss = (real_loss + fake_loss) / 2
-            d_loss.backward()
-            optimizer_D.step()
+            # Train Discriminator k times
+            for d_step in range(params.d_steps):
+                if isinstance(target_ae, ConvAE):
+                    fake_code, _ = target_ae(features.view(-1, 1, 28, 28))
+                    fake_code = fake_code.flatten(start_dim=1)
+                else:
+                    fake_code, _ = target_ae(features)
 
-            # Train AE (Generator + decoder)
-            optimizer_G.zero_grad()
+                optimizer_D.zero_grad()
+                dis_res_real_code = target_dis(real_code)
+                dis_res_fake_code = target_dis(fake_code)
 
-            gen_res_fake_code = target_dis(target_code)
-            g_loss = criterion_gan(gen_res_fake_code, valid_placeholder_fusion)
-            ae_loss = criterion_ae(features, target_rec)
-            floss = g_loss + ae_loss
-            floss.backward()
-            optimizer_G.step()
+                real_loss = criterion_gan(dis_res_real_code, valid_placeholder_fusion)
+                fake_loss = criterion_gan(dis_res_fake_code, fake_placeholder_fusion)
+                d_loss = (real_loss + fake_loss) / 2
+                d_loss.backward()
 
-        # Test the accuracy
+                optimizer_D.step()
+
+            # Train Generator & Decoder k' times
+            for g_step in range(params.g_steps):
+                if isinstance(target_ae, ConvAE):
+                    target_code, target_rec = target_ae(features.view(-1, 1, 28, 28))
+                    target_code = target_code.flatten(start_dim=1)
+                    target_rec = target_rec.view(-1, 28 * 28)
+                else:
+                    target_code, target_rec = target_ae(features)
+
+                optimizer_G.zero_grad()
+                gen_res_fake_code = target_dis(target_code)
+
+                g_loss = criterion_gan(gen_res_fake_code, valid_placeholder_fusion)
+                ae_loss = criterion_ae(features, target_rec)
+                floss = g_loss + ae_loss
+                floss.backward()
+
+                optimizer_G.step()
+
+        # Test the accuracy after this iteration
         ae_loss = 0.0
         train_acc = 0.0
         for features, label in target_train_data:

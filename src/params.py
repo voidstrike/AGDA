@@ -19,3 +19,6 @@ clf_train_iter = 200
 tag_train_iter = 200
 
 fusion_size = 128
+
+g_steps = 1
+d_steps = 1
