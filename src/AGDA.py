@@ -1,17 +1,17 @@
 import numpy as np
 import torch
-import sys
+import sys, os.path
 import os
-from src.LinearAE import LinearAE
-from src.ConvAE import ConvAE
-from src.FCNN import LinearClf, Discriminator
+from LinearAE import LinearAE
+from ConvAE import ConvAE
+from FCNN import LinearClf, Discriminator
 from torchvision.datasets import MNIST
 from torch.autograd import Variable
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchvision import transforms as tfs
 from torch import nn
-from src.usps import get_usps
-from src import params
+from usps import get_usps
+import params
 from copy import deepcopy
 
 
@@ -116,8 +116,8 @@ def main(load_model=False):
                   .format(step, ae_loss_iter / len(train_data), clf_loss_iter / len(train_data),
                           train_acc_iter / len(train_data)))
 
-        torch.save(source_ae.state_dict(), root_path + '/modeinfo/source_ae.pt')
-        torch.save(source_clf.state_dict(), root_path + '/modeinfo/source_clf.pt')
+        torch.save(source_ae.state_dict(), root_path + '/../modeinfo/source_ae.pt')
+        torch.save(source_clf.state_dict(), root_path + '/../modeinfo/source_clf.pt')
 
     # Models for target domain
     target_ae = deepcopy(source_ae)  # Copy from Source AE

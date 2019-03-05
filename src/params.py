@@ -15,7 +15,7 @@ tgt_encoder_restore = "snapshots/ADDA-target-encoder-final.pt"
 tgt_model_trained = True
 
 # params for model training
-clf_train_iter = 1
-tag_train_iter = 1
+clf_train_iter = 200
+tag_train_iter = 200
 
 fusion_size = 128

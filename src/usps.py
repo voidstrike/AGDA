@@ -14,7 +14,7 @@ import torch
 import torch.utils.data as data
 from torchvision import transforms
 
-from src import params
+import params
 
 
 class USPS(data.Dataset):
