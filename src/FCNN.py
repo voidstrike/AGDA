@@ -9,9 +9,9 @@ class LinearClf(nn.Module):
 
         # Create Sequential Model
         self.model = nn.Sequential(
-            nn.Linear(64, 32),
+            nn.Linear(100, 64),
             nn.LeakyReLU(),
-            nn.Linear(32, 32),
+            nn.Linear(64, 32),
             nn.LeakyReLU(),
             nn.Linear(32, 16),
             nn.LeakyReLU(),
@@ -33,9 +33,9 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
 
         self.model = nn.Sequential(
-            nn.Linear(64, 32),
+            nn.Linear(100, 50),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(32, 16),
+            nn.Linear(50, 16),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(16, 1),
             nn.Sigmoid()

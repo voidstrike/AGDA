@@ -3,7 +3,7 @@ import torch
 import sys, os.path
 import os
 from LinearAE import LinearAE
-from ConvAE import ConvAE
+from ConvAE import ConvAE, LeNetAE
 from FCNN import LinearClf, Discriminator
 from torchvision.datasets import MNIST
 from torch.autograd import Variable
@@ -63,7 +63,7 @@ def getModelMetric(in_dl, in_ae, in_clf, ae_criterion):
 
 
 def forwardByModelType(in_model, in_vec):
-    if isinstance(in_model, ConvAE):
+    if not isinstance(in_model, LinearAE):
         code, rec = in_model(in_vec.view(-1, 1, 28, 28))
     else:
         code, rec = in_model(in_vec)
@@ -97,7 +97,8 @@ def main(load_model=False):
     # Models for source domain
     # source_ae = BasicAE()
     # source_ae = LinearAE((28*28, 256, 64, 16, 8), None)  # Generate source AE
-    source_ae = ConvAE()
+    # source_ae = ConvAE()
+    source_ae = LeNetAE()
     source_clf = LinearClf()
 
     if load_model:
