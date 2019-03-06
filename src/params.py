@@ -23,4 +23,4 @@ fusion_size = 128
 g_steps = 1
 d_steps = 1
 
-num_disable_layer = 1
+num_disable_layer = 0

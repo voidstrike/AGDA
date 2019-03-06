@@ -57,8 +57,7 @@ def getModelMetric(in_dl, in_ae, in_clf, ae_criterion):
 
         _, pred = label_pred.max(1)
         num_correct = (pred == label).sum().item()
-        acc = num_correct / features.shape[0]
-        clf_acc += acc
+        clf_acc += num_correct
 
     return ae_loss / instance_count, clf_acc / instance_count
 
@@ -123,8 +122,10 @@ def main(load_model=False):
             ae_loss_iter = 0.0
             clf_loss_iter = 0.0
             train_acc_iter = 0.0
+            instance_count = 0.0
 
             for features, label in train_data:
+                instance_count += features.shape[0]
                 if torch.cuda.is_available():
                     features = Variable(features.view(features.shape[0], -1).cuda())
                     label = Variable(label.cuda())
@@ -150,12 +151,11 @@ def main(load_model=False):
 
                 _, pred = label_pred.max(1)
                 num_correct = (pred == label).sum().item()
-                acc = num_correct / features.shape[0]
-                train_acc_iter += acc
+                train_acc_iter += num_correct
 
             print('epoch: {}, AutoEncoder Loss: {:.6f}, Classifier Loss: {:.6f}, Train Acc: {:.6f}'
-                  .format(step, ae_loss_iter / len(train_data), clf_loss_iter / len(train_data),
-                          train_acc_iter / len(train_data)))
+                  .format(step, ae_loss_iter / instance_count, clf_loss_iter / instance_count,
+                          train_acc_iter / instance_count))
 
         torch.save(source_ae.state_dict(), root_path + '/../modeinfo/source_ae.pt')
         torch.save(source_clf.state_dict(), root_path + '/../modeinfo/source_clf.pt')
@@ -237,9 +237,9 @@ def main(load_model=False):
 
         # Test the accuracy after this iteration
         ae_loss_train, train_acc = getModelMetric(target_train_data, target_ae, source_clf, criterion_ae)
-        ae_loss_target, test_acc = getModelMetric(target_train_data, target_ae, source_clf, criterion_ae)
+        ae_loss_target, test_acc = getModelMetric(target_test_data, target_ae, source_clf, criterion_ae)
 
-        print('epoch: {}, AE Loss tra: {:.6f}, Clf Acc Tra: {:.6f}, AE Loss tar: {.6f}, Clf Acc tar: {:.6f}'
+        print('epoch: {}, AE Loss tra: {:.6f}, Clf Acc Tra: {:.6f}, AE Loss tar: {:.6f}, Clf Acc tar: {:.6f}'
               .format(step, ae_loss_train, train_acc, ae_loss_target, test_acc))
 
 
