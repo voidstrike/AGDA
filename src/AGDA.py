@@ -32,6 +32,45 @@ def setPartialTrainable(target_model, num_layer):
     return target_model
 
 
+def getModelMetric(in_dl, in_ae, in_clf, ae_criterion):
+    ae_loss = 0.0
+    clf_acc = 0.0
+    instance_count = 0.0
+    for features, label in in_dl:
+        instance_count += features.shape[0]
+        if torch.cuda.is_available():
+            features = Variable(features.view(features.shape[0], -1).cuda())
+            label = Variable(label.cuda())
+        else:
+            features = Variable(features.view(features.shape[0], -1))
+            label = Variable(label)
+
+        if isinstance(in_ae, ConvAE):
+            target_code, target_rec = in_ae(features.view(-1, 1, 28, 28))
+        else:
+            target_code, target_rec = in_ae(features)
+
+        ae_loss_batch = ae_criterion(features, target_rec)
+        ae_loss += ae_loss_batch.item()
+
+        label_pred = in_clf(target_code)
+
+        _, pred = label_pred.max(1)
+        num_correct = (pred == label).sum().item()
+        acc = num_correct / features.shape[0]
+        clf_acc += acc
+
+    return ae_loss / instance_count, clf_acc / instance_count
+
+
+def forwardByModelType(in_model, in_vec):
+    if isinstance(in_model, ConvAE):
+        code, rec = in_model(in_vec.view(-1, 1, 28, 28))
+    else:
+        code, rec = in_model(in_vec)
+    return code, rec
+
+
 def to_img(x):
     x = 0.5 * (x + 1.)
     x = x.clamp(0, 1)
@@ -54,6 +93,7 @@ def main(load_model=False):
 
     # Get target domain data
     target_train_data = get_usps(root_path + '/data', True)
+    target_test_data = get_usps(root_path + '/data', False)
 
     # Models for source domain
     # source_ae = BasicAE()
@@ -93,10 +133,7 @@ def main(load_model=False):
                     features = Variable(features.view(features.shape[0], -1))
                     label = Variable(label)
 
-                if isinstance(source_ae, ConvAE):
-                    source_code, source_rec = source_ae(features.view(-1, 1, 28, 28))
-                else:
-                    source_code, source_rec = source_ae(features)
+                source_code, source_rec = forwardByModelType(source_ae, features)
 
                 label_pred = source_clf(source_code)
 
@@ -165,19 +202,13 @@ def main(load_model=False):
                 if torch.cuda.is_available():
                     s_feature = s_feature.cuda()
 
-                if isinstance(source_ae, ConvAE):
-                    real_code, _ = source_ae(s_feature.view(-1, 1, 28, 28))
-                else:
-                    real_code, _ = source_ae(s_feature)
+                real_code, _ = forwardByModelType(source_ae, s_feature)
 
             assert real_code is not None
 
             # Train Discriminator k times
             for d_step in range(params.d_steps):
-                if isinstance(target_ae, ConvAE):
-                    fake_code, _ = target_ae(features.view(-1, 1, 28, 28))
-                else:
-                    fake_code, _ = target_ae(features)
+                fake_code, _ = forwardByModelType(target_ae, features)
 
                 optimizer_D.zero_grad()
                 dis_res_real_code = target_dis(real_code)
@@ -192,11 +223,7 @@ def main(load_model=False):
 
             # Train Generator & Decoder k' times
             for g_step in range(params.g_steps):
-                if isinstance(target_ae, ConvAE):
-                    target_code, target_rec = target_ae(features.view(-1, 1, 28, 28))
-                    target_rec = target_rec.view(-1, 28 * 28)
-                else:
-                    target_code, target_rec = target_ae(features)
+                target_code, target_rec = forwardByModelType(target_ae, features)
 
                 optimizer_G.zero_grad()
                 gen_res_fake_code = target_dis(target_code)
@@ -209,34 +236,11 @@ def main(load_model=False):
                 optimizer_G.step()
 
         # Test the accuracy after this iteration
-        ae_loss = 0.0
-        train_acc = 0.0
-        for features, label in target_train_data:
-            if torch.cuda.is_available():
-                features = Variable(features.view(features.shape[0], -1).cuda())
-                label = Variable(label.cuda())
-            else:
-                features = Variable(features.view(features.shape[0], -1))
-                label = Variable(label)
+        ae_loss_train, train_acc = getModelMetric(target_train_data, target_ae, source_clf, criterion_ae)
+        ae_loss_target, test_acc = getModelMetric(target_train_data, target_ae, source_clf, criterion_ae)
 
-            if isinstance(target_ae, ConvAE):
-                target_code, target_rec = target_ae(features.view(-1, 1, 28, 28))
-            else:
-                target_code, target_rec = target_ae(features)
-
-            loss_ae = criterion_ae(features, target_rec)
-
-            ae_loss += loss_ae.item()
-
-            label_pred = source_clf(target_code)
-
-            _, pred = label_pred.max(1)
-            num_correct = (pred == label).sum().item()
-            acc = num_correct / features.shape[0]
-            train_acc += acc
-
-        print('epoch: {}, AutoEncoder Loss: {:.6f}, Train Acc: {:.6f}'
-              .format(step, ae_loss / len(target_train_data), train_acc / len(target_train_data)))
+        print('epoch: {}, AE Loss tra: {:.6f}, Clf Acc Tra: {:.6f}, AE Loss tar: {.6f}, Clf Acc tar: {:.6f}'
+              .format(step, ae_loss_train, train_acc, ae_loss_target, test_acc))
 
 
 if __name__ == '__main__':
