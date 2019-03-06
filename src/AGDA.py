@@ -95,8 +95,6 @@ def main(load_model=False):
 
                 if isinstance(source_ae, ConvAE):
                     source_code, source_rec = source_ae(features.view(-1, 1, 28, 28))
-                    source_rec = source_rec.view(-1, 28 * 28)
-                    source_code = source_code.flatten(start_dim=1)
                 else:
                     source_code, source_rec = source_ae(features)
 
@@ -169,7 +167,6 @@ def main(load_model=False):
 
                 if isinstance(source_ae, ConvAE):
                     real_code, _ = source_ae(s_feature.view(-1, 1, 28, 28))
-                    real_code = real_code.flatten(start_dim=1)
                 else:
                     real_code, _ = source_ae(s_feature)
 
@@ -179,7 +176,6 @@ def main(load_model=False):
             for d_step in range(params.d_steps):
                 if isinstance(target_ae, ConvAE):
                     fake_code, _ = target_ae(features.view(-1, 1, 28, 28))
-                    fake_code = fake_code.flatten(start_dim=1)
                 else:
                     fake_code, _ = target_ae(features)
 
@@ -198,7 +194,6 @@ def main(load_model=False):
             for g_step in range(params.g_steps):
                 if isinstance(target_ae, ConvAE):
                     target_code, target_rec = target_ae(features.view(-1, 1, 28, 28))
-                    target_code = target_code.flatten(start_dim=1)
                     target_rec = target_rec.view(-1, 28 * 28)
                 else:
                     target_code, target_rec = target_ae(features)
@@ -226,8 +221,6 @@ def main(load_model=False):
 
             if isinstance(target_ae, ConvAE):
                 target_code, target_rec = target_ae(features.view(-1, 1, 28, 28))
-                target_code = target_code.flatten(start_dim=1)
-                target_rec = target_rec.view(-1, 28 * 28)
             else:
                 target_code, target_rec = target_ae(features)
 

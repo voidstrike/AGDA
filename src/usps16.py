@@ -45,10 +45,7 @@ class USPS16(data.Dataset):
 def get_usps(path, train):
     """Get USPS dataset loader."""
     # image pre-processing
-    pre_process = transforms.Compose([transforms.ToTensor(),
-                                      transforms.Normalize(
-                                          [.5, .5, .5],
-                                          [.5, .5, .5])])
+    pre_process = transforms.Compose([transforms.ToTensor()])
 
     # dataset and data loader
     usps_dataset = USPS16(path,
@@ -61,3 +58,18 @@ def get_usps(path, train):
         shuffle=True)
 
     return usps_data_loader
+
+
+def main():
+    root_path = os.getcwd()
+    print(root_path)
+    test_loader = get_usps(root_path + '/../data/usps.h5', True)
+
+    for f, l in test_loader:
+        pass
+        # print(f.shape)
+    pass
+
+
+if __name__ == "__main__":
+    main()
