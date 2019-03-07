@@ -2,11 +2,9 @@
 
 # params for dataset and data loader
 data_root = "data"
-dataset_mean_value = 0.5
-dataset_std_value = 0.5
-dataset_mean = (dataset_mean_value, dataset_mean_value, dataset_mean_value)
-dataset_std = (dataset_std_value, dataset_std_value, dataset_std_value)
+# batch_size must equal fusion_size for early fusion model
 batch_size = 128
+fusion_size = 128
 image_size = 64
 
 # params for target dataset
@@ -18,7 +16,7 @@ tgt_model_trained = True
 clf_train_iter = 200
 tag_train_iter = 200
 
-fusion_size = 128
+fusion_steps = 1
 
 g_steps = 1
 d_steps = 1

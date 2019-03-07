@@ -1,5 +1,5 @@
 from torch import nn
-
+from torch.nn import init
 
 # Convolution Auto Encoder
 # Hardcoded model, modify if required
@@ -36,6 +36,7 @@ class ConvAE(nn.Module):
 class LeNetAE(nn.Module):
     def __init__(self):
         super(LeNetAE, self).__init__()
+
         # Encoder Network
         self.encoder_cnn = nn.Sequential(
             nn.Conv2d(1, 6, 5, stride=1, padding=2),  # (b, 6, 28, 28)
@@ -46,16 +47,19 @@ class LeNetAE(nn.Module):
             nn.MaxPool2d(2, stride=2)  # (b, 16, 5, 5)
         )
 
+        # Channelled features to hidden space
         self.encoder_linear = nn.Sequential(
             nn.Linear(400, 100),
             nn.ReLU()
         )
 
+        # Reconstruct channelled feature vectors via code
         self.decoder_linear = nn.Sequential(
             nn.Linear(100, 400),
             nn.ReLU()
         )
 
+        # Decoder Network
         self.decoder_cnn = nn.Sequential(
             nn.ConvTranspose2d(16, 16, 2, stride=2),  # (b, 16, 10, 10)
             nn.ReLU(True),
@@ -64,6 +68,11 @@ class LeNetAE(nn.Module):
             nn.ConvTranspose2d(6, 1, 4, stride=2, padding=1),  # (b, 1, 28, 28)
             nn.Tanh()
         )
+
+        for module in self.modules():
+            if isinstance(module, nn.Conv2d) or isinstance(module, nn.ConvTranspose2d):
+                init.xavier_uniform_(module.weight)
+
 
     def forward(self, x):
         code = self.encoder_cnn(x)
