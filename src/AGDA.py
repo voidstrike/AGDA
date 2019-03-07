@@ -45,10 +45,7 @@ def getModelMetric(in_dl, in_ae, in_clf, ae_criterion):
             features = Variable(features.view(features.shape[0], -1))
             label = Variable(label)
 
-        if isinstance(in_ae, ConvAE):
-            target_code, target_rec = in_ae(features.view(-1, 1, 28, 28))
-        else:
-            target_code, target_rec = in_ae(features)
+        target_code, target_rec = forwardByModelType(in_ae, features)
 
         ae_loss_batch = ae_criterion(features, target_rec)
         ae_loss += ae_loss_batch.item()
@@ -208,10 +205,10 @@ def main(load_model=False):
             assert real_code is not None
 
             # Train Discriminator k times
+            fake_code, _ = forwardByModelType(target_ae, features)
             for d_step in range(params.d_steps):
-                fake_code, _ = forwardByModelType(target_ae, features)
-
                 optimizer_D.zero_grad()
+                
                 dis_res_real_code = target_dis(real_code)
                 dis_res_fake_code = target_dis(fake_code)
 
