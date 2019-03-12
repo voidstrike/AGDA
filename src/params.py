@@ -5,7 +5,7 @@ data_root = "data"
 # TODO
 # batch_size must equal fusion_size for early fusion model
 batch_size = 128
-fusion_size = 128
+fusion_size = 256
 image_size = 64
 
 # params for target dataset
@@ -19,12 +19,12 @@ target_data_set = "usps"
 
 # params for model training
 clf_train_iter = 200
-tag_train_iter = 200
+tag_train_iter = 20000
 
 fusion_steps = 1
 
 g_steps = 1
-d_steps = 1
+d_steps = 2
 
 num_disable_layer = 0
 

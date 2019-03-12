@@ -83,7 +83,7 @@ def getDataLoader(ds_name, root_path, train=True):
     else:
         raise Exception("Unsupported Dataset")
 
-    r_sampler = RandomSampler(data_set, True, params.fusion_size)
+    r_sampler = RandomSampler(data_set, replacement=True, num_samples=params.fusion_size)
     target_dl = DataLoader(data_set, batch_size=params.batch_size, shuffle=True)
     if train:
         target_dl_fusion = DataLoader(data_set, sampler=r_sampler, batch_size=params.fusion_size)
@@ -186,7 +186,7 @@ def main(load_model=False):
     setPartialTrainable(target_ae, params.num_disable_layer)
     # target_ae = LinearAE((28*28, 256, 64, 16, 8), None)
 
-    optimizer_G = torch.optim.Adam(target_ae.parameters(), lr=1e-4)
+    optimizer_G = torch.optim.Adam(target_ae.parameters(), lr=1e-3)
     optimizer_D = torch.optim.Adam(target_dis.parameters(), lr=1e-3)
 
     valid_placeholder_fusion = Variable(torch.from_numpy(np.ones((params.fusion_size, 1), dtype='float32')),
@@ -225,7 +225,10 @@ def main(load_model=False):
                 real_loss = criterion_gan(dis_res_real_code, valid_placeholder_fusion)
                 fake_loss = criterion_gan(dis_res_fake_code, fake_placeholder_fusion)
                 d_loss = (real_loss + fake_loss) / 2
-                d_loss.backward(retain_graph=True)
+                if d_step != params.d_steps - 1:
+                    d_loss.backward(retain_graph=True)
+                else:    
+                    d_loss.backward()
 
                 optimizer_D.step()
 
@@ -244,11 +247,12 @@ def main(load_model=False):
                 optimizer_G.step()
 
         # Test the accuracy after this iteration
-        ae_loss_train, train_acc = getModelPerformance(target_train_data, target_ae, source_clf, criterion_ae)
-        ae_loss_target, test_acc = getModelPerformance(target_test_data, target_ae, source_clf, criterion_ae)
+        if step % 200 == 0:
+            ae_loss_train, train_acc = getModelPerformance(target_train_data, target_ae, source_clf, criterion_ae)
+            ae_loss_target, test_acc = getModelPerformance(target_test_data, target_ae, source_clf, criterion_ae)
 
-        print('Epoch: {}, AE Loss train: {:.6f}, Clf Acc Train: {:.6f}, AE Loss Target: {:.6f}, Clf Acc Target: {:.6f}'
-              .format(step, ae_loss_train, train_acc, ae_loss_target, test_acc))
+            print('Epoch: {}, AE Loss train: {:.6f}, Clf Acc Train: {:.6f}, AE Loss Target: {:.6f}, Clf Acc Target: {:.6f}'
+                .format(step, ae_loss_train, train_acc, ae_loss_target, test_acc))
 
 
 if __name__ == '__main__':
