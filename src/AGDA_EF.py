@@ -11,7 +11,7 @@ from torchvision import transforms as tfs
 from torch import nn
 
 from LinearAE import LinearAE
-from ConvAE import ConvAE, LeNetAE28
+from ConvAE import ConvAE, LeNetAE28, LeNetAE32
 from FCNN import LinearClf, Discriminator
 from usps import USPS
 
@@ -25,8 +25,13 @@ def setPartialTrainable(target_model, num_layer):
                 if isinstance(eachLayer, torch.nn.Linear) and ct < num_layer:
                     eachLayer.requires_grad = False
                     ct += 1
-        elif isinstance(target_model, ConvAE) or isinstance(target_model, LeNetAE28):
+        elif isinstance(target_model, ConvAE):
             for eachLayer in target_model.encoder:
+                if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
+                    eachLayer.requires_grad = False
+                    ct += 1
+        elif isinstance(target_model, LeNetAE28) or isinstance(target_model, LeNetAE32):
+            for eachLayer in target_model.encoder_cnn:
                 if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
                     eachLayer.requires_grad = False
                     ct += 1

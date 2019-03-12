@@ -12,7 +12,7 @@ from torch import nn
 from copy import deepcopy
 
 from LinearAE import LinearAE
-from ConvAE import ConvAE, LeNetAE28
+from ConvAE import ConvAE, LeNetAE28, LeNetAE32
 from FCNN import LinearClf, Discriminator
 from usps import USPS
 from GSVHN import GSVHN

@@ -1,5 +1,7 @@
 from torch import nn
 from torch.nn import init
+from torch.autograd import Variable
+import torch
 
 # Convolution Auto Encoder
 # Hardcoded model, modify if required
@@ -33,15 +35,18 @@ class ConvAE(nn.Module):
         rec = rec.view(-1, 28 * 28)
         return code, rec
 
+
 class LeNetAE28(nn.Module):
     def __init__(self):
         super(LeNetAE28, self).__init__()
 
         # Encoder Network
         self.encoder_cnn = nn.Sequential(
+            DynamicGNoise(28, std=0.05),
             nn.Conv2d(1, 6, 5, stride=1, padding=2),  # (b, 6, 28, 28)
             nn.ReLU(True),
             nn.MaxPool2d(2, stride=2),  # (b, 16, 14, 14)
+            DynamicGNoise(14, std=0.05),
             nn.Conv2d(6, 16, 5, stride=1),  # (b, 16, 10, 10)
             nn.ReLU(True),
             nn.MaxPool2d(2, stride=2)  # (b, 16, 5, 5)
@@ -139,3 +144,19 @@ class LeNetAE32(nn.Module):
 
         rec = rec.view(-1, 28 * 28)
         return code, rec
+
+
+class DynamicGNoise(nn.Module):
+    def __init__(self, shape, std=0.05):
+        super(DynamicGNoise, self).__init__()
+        # self.noise = Variable(torch.zeros(shape, shape).cuda())
+        self.noise = Variable(torch.zeros(shape, shape))
+        self.std = std
+
+    def forward(self, x):
+        if not self.training:
+            return x
+
+        self.noise.data.normal_(0, std=self.std)
+        print(x.size(), self.noise.size())
+        return x + self.noise.expand_as(x)
