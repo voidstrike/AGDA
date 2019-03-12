@@ -4,7 +4,7 @@ import params
 import sys
 import torch
 
-from torchvision.datasets import MNIST, SVHN
+from torchvision.datasets import MNIST
 from torch.autograd import Variable
 from torch.utils.data import DataLoader, RandomSampler
 from torchvision import transforms as tfs
@@ -12,9 +12,10 @@ from torch import nn
 from copy import deepcopy
 
 from LinearAE import LinearAE
-from ConvAE import ConvAE, LeNetAE
+from ConvAE import ConvAE, LeNetAE28
 from FCNN import LinearClf, Discriminator
 from usps import USPS
+from GSVHN import GSVHN
 
 
 def setPartialTrainable(target_model, num_layer):
@@ -26,7 +27,7 @@ def setPartialTrainable(target_model, num_layer):
                 if isinstance(eachLayer, torch.nn.Linear) and ct < num_layer:
                     eachLayer.requires_grad = False
                     ct += 1
-        elif isinstance(target_model, ConvAE) or isinstance(target_model, LeNetAE):
+        elif isinstance(target_model, ConvAE) or isinstance(target_model, LeNetAE28):
             for eachLayer in target_model.encoder:
                 if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
                     eachLayer.requires_grad = False
@@ -75,11 +76,11 @@ def getDataLoader(ds_name, root_path, train=True):
 
     # Get data set by their name
     if ds_name == "mnist":
-        data_set = MNIST(root_path + '/data/mnist',  train=train, transform=im_tfs, download=True)
+        data_set = MNIST(root_path + '/../data/mnist',  train=train, transform=im_tfs, download=True)
     elif ds_name == "usps":
-        data_set = USPS(root_path + '/data', train=train, transform=im_tfs, download=True)
+        data_set = USPS(root_path + '/../data', train=train, transform=im_tfs, download=True)
     elif ds_name == "svhn":
-        data_set = SVHN(root_path + '/data/svhn', split='train' if train else 'test', transform=im_tfs, download=True)
+        data_set = GSVHN(root_path + '/../data/svhn', split='train' if train else 'test', transform=im_tfs, download=True)
     else:
         raise Exception("Unsupported Dataset")
 
@@ -104,6 +105,11 @@ im_tfs = tfs.Compose([
     tfs.ToTensor()
 ])
 
+o_tfs = tfs.Compose([
+    tfs.CenterCrop(28),
+    tfs.ToTensor()
+])
+
 
 def main(load_model=False):
     root_path = os.getcwd()
@@ -116,7 +122,7 @@ def main(load_model=False):
     target_test_data, _ = getDataLoader('usps', root_path, False)
 
     # Initialize models for source domain
-    source_ae = LeNetAE()
+    source_ae = LeNetAE28()
     source_clf = LinearClf()
 
     # Initialize models for target domain

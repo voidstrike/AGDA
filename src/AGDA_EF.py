@@ -9,10 +9,9 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader, RandomSampler
 from torchvision import transforms as tfs
 from torch import nn
-from copy import deepcopy
 
 from LinearAE import LinearAE
-from ConvAE import ConvAE, LeNetAE
+from ConvAE import ConvAE, LeNetAE28
 from FCNN import LinearClf, Discriminator
 from usps import USPS
 
@@ -26,7 +25,7 @@ def setPartialTrainable(target_model, num_layer):
                 if isinstance(eachLayer, torch.nn.Linear) and ct < num_layer:
                     eachLayer.requires_grad = False
                     ct += 1
-        elif isinstance(target_model, ConvAE) or isinstance(target_model, LeNetAE):
+        elif isinstance(target_model, ConvAE) or isinstance(target_model, LeNetAE28):
             for eachLayer in target_model.encoder:
                 if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
                     eachLayer.requires_grad = False
@@ -117,11 +116,11 @@ def main(load_model=False):
     target_test_data, _ = getDataLoader('usps', root_path, False)
 
     # Initialize models for source domain
-    source_ae = LeNetAE()
+    source_ae = LeNetAE28()
     source_clf = LinearClf()
 
     # Initialize models for target domain
-    target_ae = LeNetAE()
+    target_ae = LeNetAE28()
     target_dis = Discriminator()
 
     if load_model:
@@ -153,7 +152,7 @@ def main(load_model=False):
 
     if not load_model:
         # Train AE & CLF from scratch
-        # Fusion the domain in hidden space each iteration
+        # Fuse the domain in hidden space each iteration
         instance_count = source_train_data.dataset.__len__()
         for step in range(params.clf_train_iter):
             ae_loss_iter, clf_loss_iter, train_acc_iter = .0, .0, .0
