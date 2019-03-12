@@ -21,7 +21,7 @@ target_data_set = "usps"
 clf_train_iter = 200
 tag_train_iter = 20000
 
-fusion_steps = 1
+fusion_steps = 10
 
 g_steps = 1
 d_steps = 2

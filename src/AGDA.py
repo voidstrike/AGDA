@@ -26,7 +26,7 @@ def setPartialTrainable(target_model, num_layer):
                 if isinstance(eachLayer, torch.nn.Linear) and ct < num_layer:
                     eachLayer.requires_grad = False
                     ct += 1
-        elif isinstance(target_model, ConvAE):
+        elif isinstance(target_model, ConvAE) or isinstance(target_model, LeNetAE):
             for eachLayer in target_model.encoder:
                 if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
                     eachLayer.requires_grad = False
@@ -146,8 +146,6 @@ def main(load_model=False):
             ae_loss_iter, clf_loss_iter, train_acc_iter = .0, .0, .0
 
             for features, label in source_train_data:
-                instance_count += features.shape[0]
-
                 if torch.cuda.is_available():
                     features = Variable(features.view(features.shape[0], -1).cuda())
                     label = Variable(label.cuda())
