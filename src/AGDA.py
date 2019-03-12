@@ -27,8 +27,13 @@ def setPartialTrainable(target_model, num_layer):
                 if isinstance(eachLayer, torch.nn.Linear) and ct < num_layer:
                     eachLayer.requires_grad = False
                     ct += 1
-        elif isinstance(target_model, ConvAE) or isinstance(target_model, LeNetAE28):
+        elif isinstance(target_model, ConvAE):
             for eachLayer in target_model.encoder:
+                if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
+                    eachLayer.requires_grad = False
+                    ct += 1
+        elif isinstance(target_model, LeNetAE28) or isinstance(target_model, LeNetAE32):
+            for eachLayer in target_model.encoder_cnn:
                 if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
                     eachLayer.requires_grad = False
                     ct += 1
@@ -80,7 +85,7 @@ def getDataLoader(ds_name, root_path, train=True):
     elif ds_name == "usps":
         data_set = USPS(root_path + '/../data', train=train, transform=im_tfs, download=True)
     elif ds_name == "svhn":
-        data_set = GSVHN(root_path + '/../data/svhn', split='train' if train else 'test', transform=im_tfs, download=True)
+        data_set = GSVHN(root_path + '/../data/svhn', split='train' if train else 'test', transform=o_tfs, download=True)
     else:
         raise Exception("Unsupported Dataset")
 
@@ -190,8 +195,8 @@ def main(load_model=False):
     setPartialTrainable(target_ae, params.num_disable_layer)
     # target_ae = LinearAE((28*28, 256, 64, 16, 8), None)
 
-    optimizer_G = torch.optim.Adam(target_ae.parameters(), lr=1e-3)
-    optimizer_D = torch.optim.Adam(target_dis.parameters(), lr=1e-3)
+    optimizer_G = torch.optim.Adam(target_ae.parameters(), lr=1e-4)
+    optimizer_D = torch.optim.Adam(target_dis.parameters(), lr=1e-4)
 
     valid_placeholder_fusion = Variable(torch.from_numpy(np.ones((params.fusion_size, 1), dtype='float32')),
                                  requires_grad=False)
