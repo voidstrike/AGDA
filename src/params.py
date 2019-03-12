@@ -22,3 +22,6 @@ g_steps = 1
 d_steps = 1
 
 num_disable_layer = 0
+
+source_data_set = "MNIST"
+target_data_set = "USPS"

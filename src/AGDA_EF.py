@@ -98,9 +98,6 @@ def main(load_model=False):
     source_clf = LinearClf()
     target_dis = Discriminator()
 
-    optimizer_G = torch.optim.Adam(target_ae.parameters(), lr=1e-4)
-    optimizer_D = torch.optim.Adam(target_dis.parameters(), lr=1e-3)
-
     valid_placeholder_fusion = Variable(torch.from_numpy(np.ones((params.fusion_size, 1), dtype='float32')),
                                         requires_grad=False)
     fake_placeholder_fusion = Variable(torch.from_numpy(np.zeros((params.fusion_size, 1), dtype='float32')),
@@ -117,6 +114,8 @@ def main(load_model=False):
     criterion_gan = nn.BCELoss()                    # Auxiliary loss for GAN (Discriminator)
 
     sae_opt = torch.optim.Adam(list(source_ae.parameters()) + list(source_clf.parameters()), lr=1e-3)
+    optimizer_G = torch.optim.Adam(target_ae.parameters(), lr=1e-4)
+    optimizer_D = torch.optim.Adam(target_dis.parameters(), lr=1e-3)
 
     if torch.cuda.is_available():
         source_ae = source_ae.cuda()

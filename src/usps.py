@@ -127,10 +127,17 @@ def get_usps(path, train, new_batch=params.batch_size, sampler=None):
                         transform=pre_process,
                         download=True)
 
-    usps_data_loader = torch.utils.data.DataLoader(
-        dataset=usps_dataset,
-        batch_size=new_batch,
-        sampler=sampler,
-        shuffle=True)
+    if sampler is None:
+        usps_data_loader = torch.utils.data.DataLoader(
+            dataset=usps_dataset,
+            batch_size=new_batch,
+            sampler=sampler,
+            shuffle=True)
+    else:
+        usps_data_loader = torch.utils.data.DataLoader(
+            dataset=usps_dataset,
+            batch_size=new_batch,
+            sampler=sampler,
+            shuffle=False)
 
     return usps_data_loader

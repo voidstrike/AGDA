@@ -2,10 +2,11 @@ import numpy as np
 import torch
 import sys, os.path
 import os
+import argparse
 from LinearAE import LinearAE
 from ConvAE import ConvAE, LeNetAE
 from FCNN import LinearClf, Discriminator
-from torchvision.datasets import MNIST
+from torchvision.datasets import MNIST, SVHN
 from torch.autograd import Variable
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchvision import transforms as tfs
@@ -32,7 +33,7 @@ def setPartialTrainable(target_model, num_layer):
     return target_model
 
 
-def getModelMetric(in_dl, in_ae, in_clf, ae_criterion):
+def getModelPerformance(in_dl, in_ae, in_clf, ae_criterion):
     ae_loss = 0.0
     clf_acc = 0.0
     instance_count = 0.0
@@ -65,6 +66,25 @@ def forwardByModelType(in_model, in_vec):
     else:
         code, rec = in_model(in_vec)
     return code, rec
+
+
+def getDataLoader(ds_name, root_path, train=True):
+    if ds_name == "mnist":
+        data_set = MNIST(root_path + '/data/mnist', transform=im_tfs, download=True, train=train)
+        target_dl = DataLoader(data_set, batch_size=params.batch_size, shuffle=True)
+        target_dl_fusion = DataLoader(data_set, batch_size=params.fusion_size, shuffle=True)
+    elif ds_name == "usps":
+        target_dl = get_usps(root_path + '/data', train)
+        target_dl_fusion = get_usps(root_path + '/data', train, params.fusion_size)
+    elif ds_name == "svhn":
+        data_set = SVHN(root_path + '/data/mnist', transform=im_tfs, download=True, split='train' if train else 'test')
+        target_dl = DataLoader(data_set, batch_size=params.batch_size, shuffle=True)
+        target_dl_fusion = DataLoader(data_set, batch_size=params.fusion_size, shuffle=True)
+    else:
+        target_dl = None
+        target_dl_fusion = None
+
+    return target_dl, target_dl_fusion
 
 
 def to_img(x):
@@ -234,8 +254,8 @@ def main(load_model=False):
                 optimizer_G.step()
 
         # Test the accuracy after this iteration
-        ae_loss_train, train_acc = getModelMetric(target_train_data, target_ae, source_clf, criterion_ae)
-        ae_loss_target, test_acc = getModelMetric(target_test_data, target_ae, source_clf, criterion_ae)
+        ae_loss_train, train_acc = getModelPerformance(target_train_data, target_ae, source_clf, criterion_ae)
+        ae_loss_target, test_acc = getModelPerformance(target_test_data, target_ae, source_clf, criterion_ae)
 
         print('epoch: {}, AE Loss tra: {:.6f}, Clf Acc Tra: {:.6f}, AE Loss tar: {:.6f}, Clf Acc tar: {:.6f}'
               .format(step, ae_loss_train, train_acc, ae_loss_target, test_acc))
@@ -243,6 +263,7 @@ def main(load_model=False):
 
 if __name__ == '__main__':
     Load_flag = False
+    parser = argparse.ArgumentParser(description='Process some integers.')
     if len(sys.argv) > 1:
         Load_flag = bool(sys.argv[1])
     main(Load_flag)
