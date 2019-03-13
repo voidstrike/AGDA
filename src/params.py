@@ -24,8 +24,10 @@ tag_train_iter = 20000
 fusion_steps = 10
 
 g_steps = 1
-d_steps = 2
+g_learning_rate = 1e-3
+d_steps = 1
+d_learning_rate = 1e-4
 
-num_disable_layer = 0
+num_disable_layer = 1
 
 

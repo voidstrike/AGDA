@@ -12,8 +12,8 @@ from torch import nn
 from copy import deepcopy
 
 from LinearAE import LinearAE
-from ConvAE import ConvAE, LeNetAE28, LeNetAE32
-from FCNN import LinearClf, Discriminator
+from ConvAE import  LeNetAE28, LeNetAE32
+from FCNN import LinearClf100, Discriminator100, LinearClf400, Discriminator400
 from usps import USPS
 from GSVHN import GSVHN
 
@@ -27,11 +27,6 @@ def setPartialTrainable(target_model, num_layer):
                 if isinstance(eachLayer, torch.nn.Linear) and ct < num_layer:
                     eachLayer.requires_grad = False
                     ct += 1
-        elif isinstance(target_model, ConvAE):
-            for eachLayer in target_model.encoder:
-                if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
-                    eachLayer.requires_grad = False
-                    ct += 1
         elif isinstance(target_model, LeNetAE28) or isinstance(target_model, LeNetAE32):
             for eachLayer in target_model.encoder_cnn:
                 if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
@@ -43,9 +38,8 @@ def setPartialTrainable(target_model, num_layer):
 def getModelPerformance(in_dl, in_ae, in_clf, ae_criterion):
     ae_loss = 0.0
     clf_acc = 0.0
-    instance_count = 0.0
+    instance_count = in_dl.dataset.__len__()
     for features, label in in_dl:
-        instance_count += features.shape[0]
         if torch.cuda.is_available():
             features = Variable(features.view(features.shape[0], -1).cuda())
             label = Variable(label.cuda())
@@ -116,11 +110,14 @@ o_tfs = tfs.Compose([
 ])
 
 
-def main(load_model=False):
+def main(load_model=False, hidden_dim=100):
+    if hidden_dim != 100 and hidden_dim != 400:
+        raise Exception("Unsupported Hidden Dimension")
     root_path = os.getcwd()
 
     # Get source domain data
     source_train_data, source_train_data_fusion = getDataLoader(params.source_data_set, root_path, True)
+    source_test_data, _ = getDataLoader(params.source_data_set, root_path, False)
 
     # Get target domain data
     target_train_data, target_train_data_fusion = getDataLoader(params.target_data_set, root_path, True)
@@ -128,11 +125,11 @@ def main(load_model=False):
 
     # Initialize models for source domain
     source_ae = LeNetAE28()
-    source_clf = LinearClf()
+    source_clf = LinearClf100() if hidden_dim == 100 else LinearClf400()
 
     # Initialize models for target domain
     # target_ae = LeNetAE()
-    target_dis = Discriminator()
+    target_dis = Discriminator100() if hidden_dim == 100 else Discriminator400()
 
     if load_model:
         source_ae.load_state_dict(torch.load(root_path + '/../modeinfo/source_ae.pt'))
@@ -190,13 +187,20 @@ def main(load_model=False):
         torch.save(source_ae.state_dict(), root_path + '/../modeinfo/source_ae.pt')
         torch.save(source_clf.state_dict(), root_path + '/../modeinfo/source_clf.pt')
 
+    # Show the performance of trained model in source domain, train & test set
+    ae_loss_train, train_acc = getModelPerformance(target_train_data, source_ae, source_clf, criterion_ae)
+    ae_loss_test, test_acc = getModelPerformance(target_test_data, source_ae, source_clf, criterion_ae)
+
+    print('Trained Model AE Loss train: {:.6f}, Clf Acc Train: {:.6f}, AE Loss Target: {:.6f}, Clf Acc Target: {:.6f}'
+          .format(ae_loss_train, train_acc, ae_loss_test, test_acc))
+
     # Models for target domain
     target_ae = deepcopy(source_ae)  # Copy from Source AE
     setPartialTrainable(target_ae, params.num_disable_layer)
     # target_ae = LinearAE((28*28, 256, 64, 16, 8), None)
 
-    optimizer_G = torch.optim.Adam(target_ae.parameters(), lr=1e-4)
-    optimizer_D = torch.optim.Adam(target_dis.parameters(), lr=1e-4)
+    optimizer_G = torch.optim.Adam(target_ae.parameters(), lr=params.g_learning_rate)
+    optimizer_D = torch.optim.Adam(target_dis.parameters(), lr=params.d_learning_rate)
 
     valid_placeholder_fusion = Variable(torch.from_numpy(np.ones((params.fusion_size, 1), dtype='float32')),
                                  requires_grad=False)
@@ -258,14 +262,17 @@ def main(load_model=False):
         # Test the accuracy after this iteration
         if step % 200 == 0:
             ae_loss_train, train_acc = getModelPerformance(target_train_data, target_ae, source_clf, criterion_ae)
-            ae_loss_target, test_acc = getModelPerformance(target_test_data, target_ae, source_clf, criterion_ae)
+            ae_loss_test, test_acc = getModelPerformance(target_test_data, target_ae, source_clf, criterion_ae)
 
             print('Epoch: {}, AE Loss train: {:.6f}, Clf Acc Train: {:.6f}, AE Loss Target: {:.6f}, Clf Acc Target: {:.6f}'
-                .format(step, ae_loss_train, train_acc, ae_loss_target, test_acc))
+                .format(step, ae_loss_train, train_acc, ae_loss_test, test_acc))
 
 
 if __name__ == '__main__':
-    Load_flag = False
-    if len(sys.argv) > 1:
-        Load_flag = bool(sys.argv[1])
-    main(Load_flag)
+    load_flag = False
+    hidden_dim = 100
+    if len(sys.argv) > 2:
+        load_flag = bool(sys.argv[1] == 'True')
+        hidden_dim = int(sys.argv[2])
+
+    main(load_flag, hidden_dim)
