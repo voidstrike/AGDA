@@ -3,6 +3,7 @@ import os
 import params
 import sys
 import torch
+import datetime
 
 from torchvision.datasets import MNIST
 from torch.autograd import Variable
@@ -125,7 +126,10 @@ def main(load_model=False, hidden_dim=100):
 
     # Initialize models for source domain
     source_ae = LeNetAE28()
-    source_clf = LinearClf100() if hidden_dim == 100 else LinearClf400()
+    if hidden_dim == 100:
+        source_clf = LinearClf100()
+    elif hidden_dim == 400:
+        source_clf = LinearClf400()
 
     # Initialize models for target domain
     # target_ae = LeNetAE()
@@ -188,8 +192,8 @@ def main(load_model=False, hidden_dim=100):
         torch.save(source_clf.state_dict(), root_path + '/../modeinfo/source_clf.pt')
 
     # Show the performance of trained model in source domain, train & test set
-    ae_loss_train, train_acc = getModelPerformance(target_train_data, source_ae, source_clf, criterion_ae)
-    ae_loss_test, test_acc = getModelPerformance(target_test_data, source_ae, source_clf, criterion_ae)
+    ae_loss_train, train_acc = getModelPerformance(source_train_data, source_ae, source_clf, criterion_ae)
+    ae_loss_test, test_acc = getModelPerformance(source_test_data, source_ae, source_clf, criterion_ae)
 
     print('Trained Model AE Loss train: {:.6f}, Clf Acc Train: {:.6f}, AE Loss Target: {:.6f}, Clf Acc Target: {:.6f}'
           .format(ae_loss_train, train_acc, ae_loss_test, test_acc))
@@ -214,6 +218,9 @@ def main(load_model=False, hidden_dim=100):
         fake_placeholder_fusion = fake_placeholder_fusion.cuda()
 
     # Train target AE and Discriminator
+    currentDT = datetime.datetime.now()
+    currentDT = str(currentDT.strftime("%m-%d-%H-%M"))
+    tmp_log = open(root_path + "/../log/experiment_log_" + currentDT + ".txt", 'w')
     for step in range(params.tag_train_iter):
         for features, _ in target_train_data_fusion:
             if torch.cuda.is_available():
@@ -223,7 +230,8 @@ def main(load_model=False, hidden_dim=100):
 
             real_code = None
             for s_feature, _ in source_train_data_fusion:
-                s_feature = s_feature.cuda() if torch.cuda.is_available() else s_feature
+                if torch.cuda.is_available():
+                    s_feature = s_feature.cuda()
                 real_code, _ = forwardByModelType(source_ae, s_feature)
             assert real_code is not None
 
@@ -266,7 +274,9 @@ def main(load_model=False, hidden_dim=100):
 
             print('Epoch: {}, AE Loss train: {:.6f}, Clf Acc Train: {:.6f}, AE Loss Target: {:.6f}, Clf Acc Target: {:.6f}'
                 .format(step, ae_loss_train, train_acc, ae_loss_test, test_acc))
+            tmp_log.write('{}, {:.6f}, {:.6f}, {:.6f}, {:.6f}\n'.format(step, ae_loss_train, train_acc, ae_loss_test, test_acc))
 
+    tmp_log.close()
 
 if __name__ == '__main__':
     load_flag = False

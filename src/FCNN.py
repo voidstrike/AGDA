@@ -39,7 +39,7 @@ class LinearClf400(nn.Module):
             nn.Linear(120, 84),
             nn.LeakyReLU(),
             nn.Linear(84, 10),
-            nn.Softmax(dim=1)
+            #nn.Softmax(dim=1)
         )
 
         # Initialize the weight via Xavier

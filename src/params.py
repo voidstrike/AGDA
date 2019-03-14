@@ -18,8 +18,8 @@ source_data_set = "mnist"
 target_data_set = "usps"
 
 # params for model training
-clf_train_iter = 200
-tag_train_iter = 20000
+clf_train_iter = 100
+tag_train_iter = 40000
 
 fusion_steps = 10
 
@@ -28,6 +28,6 @@ g_learning_rate = 1e-3
 d_steps = 1
 d_learning_rate = 1e-4
 
-num_disable_layer = 1
+num_disable_layer = 0
 
 
