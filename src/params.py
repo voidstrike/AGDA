@@ -15,7 +15,7 @@ tgt_model_trained = True
 
 # params for data set selection
 source_data_set = "mnist"
-target_data_set = "usps"
+target_data_set = "svhn"
 
 # params for model training
 clf_train_iter = 100
@@ -24,10 +24,10 @@ tag_train_iter = 40000
 fusion_steps = 10
 
 g_steps = 1
-g_learning_rate = 1e-3
-d_steps = 1
+g_learning_rate = 1e-4
+d_steps = 2
 d_learning_rate = 1e-4
 
-num_disable_layer = 0
+num_disable_layer = 1
 
 

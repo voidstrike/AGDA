@@ -122,7 +122,7 @@ def main(load_model=False, hidden_dim=100):
 
     # Get target domain data
     target_train_data, target_train_data_fusion = getDataLoader(params.target_data_set, root_path, True)
-    target_test_data, _ = getDataLoader('usps', root_path, False)
+    target_test_data, _ = getDataLoader(params.target_data_set, root_path, False)
 
     # Initialize models for source domain
     source_ae = LeNetAE28()
@@ -172,6 +172,7 @@ def main(load_model=False, hidden_dim=100):
                 loss_ae = criterion_ae(features, source_rec)
                 loss_clf = criterion_clf(label_predict, label)
                 floss = loss_ae + loss_clf
+                #floss = loss_clf
 
                 src_optimizer.zero_grad()
                 floss.backward()
@@ -200,6 +201,7 @@ def main(load_model=False, hidden_dim=100):
 
     # Models for target domain
     target_ae = deepcopy(source_ae)  # Copy from Source AE
+    # target_ae = LeNetAE28()
     setPartialTrainable(target_ae, params.num_disable_layer)
     # target_ae = LinearAE((28*28, 256, 64, 16, 8), None)
 
@@ -246,6 +248,9 @@ def main(load_model=False, hidden_dim=100):
                 real_loss = criterion_gan(dis_res_real_code, valid_placeholder_fusion)
                 fake_loss = criterion_gan(dis_res_fake_code, fake_placeholder_fusion)
                 d_loss = (real_loss + fake_loss) / 2
+                
+                #print("R : {:.6f}, F : {:.6f}".format(real_loss.item(), fake_loss.item()))
+
                 if d_step != params.d_steps - 1:
                     d_loss.backward(retain_graph=True)
                 else:    
@@ -263,6 +268,8 @@ def main(load_model=False, hidden_dim=100):
                 g_loss = criterion_gan(gen_res_fake_code, valid_placeholder_fusion)
                 ae_loss = criterion_ae(features, target_rec)
                 floss = g_loss + ae_loss
+                #floss = g_loss
+                #print(floss.item())
                 floss.backward()
 
                 optimizer_G.step()

@@ -11,11 +11,11 @@ class LeNetAE28(nn.Module):
 
         # Encoder Network
         self.encoder_cnn = nn.Sequential(
-            # DynamicGNoise(28, std=0.05),
+            DynamicGNoise(28, std=0.05),
             nn.Conv2d(1, 6, 5, stride=1, padding=2),  # (b, 6, 28, 28)
             nn.LeakyReLU(),
             nn.AvgPool2d(2, stride=2),  # (b, 16, 14, 14)
-            # DynamicGNoise(14, std=0.05),
+            DynamicGNoise(14, std=0.05),
             nn.Conv2d(6, 16, 5, stride=1),  # (b, 16, 10, 10)
             nn.LeakyReLU(),
             nn.AvgPool2d(2, stride=2)  # (b, 16, 5, 5)
@@ -118,8 +118,8 @@ class LeNetAE32(nn.Module):
 class DynamicGNoise(nn.Module):
     def __init__(self, shape, std=0.05):
         super(DynamicGNoise, self).__init__()
-        # self.noise = Variable(torch.zeros(shape, shape).cuda())
-        self.noise = Variable(torch.zeros(shape, shape))
+        self.noise = Variable(torch.zeros(shape, shape).cuda())
+        #  self.noise = Variable(torch.zeros(shape, shape))
         self.std = std
 
     def forward(self, x):
@@ -127,5 +127,5 @@ class DynamicGNoise(nn.Module):
             return x
 
         self.noise.data.normal_(0, std=self.std)
-        print(x.size(), self.noise.size())
+        #print(x.size(), self.noise.size())
         return x + self.noise.expand_as(x)

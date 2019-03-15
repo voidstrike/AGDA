@@ -81,7 +81,8 @@ class Discriminator400(nn.Module):
             nn.Linear(120, 10),
             nn.LeakyReLU(),
             nn.Linear(10, 1),
-            nn.Softmax(dim=1)
+            #nn.Softmax(dim=1)
+            nn.Sigmoid()
         )
 
     def forward(self, img):
