@@ -76,12 +76,12 @@ class Discriminator400(nn.Module):
         super(Discriminator400, self).__init__()
 
         self.model = nn.Sequential(
-            nn.Linear(400, 120),
+            nn.Linear(400, 200),
             nn.LeakyReLU(),
-            nn.Linear(120, 10),
+            nn.Linear(200, 200),
             nn.LeakyReLU(),
-            nn.Linear(10, 1),
-            #nn.Softmax(dim=1)
+            nn.Linear(200, 1),
+            # nn.Softmax(dim=1)
             nn.Sigmoid()
         )
 

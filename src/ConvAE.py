@@ -67,33 +67,24 @@ class LeNetAE32(nn.Module):
 
         # Encoder Network
         self.encoder_cnn = nn.Sequential(
-            nn.Conv2d(3, 6, 5, stride=1, padding=0),  # (b, 6, 28, 28)
+            # DynamicGNoise(32, std=0.05),
+            nn.Conv2d(1, 6, 5, stride=1, padding=0),  # (b, 6, 28, 28)
             nn.ReLU(True),
-            nn.MaxPool2d(2, stride=2),  # (b, 6, 14, 14)
+            nn.AvgPool2d(2, stride=2),  # (b, 6, 14, 14)
+            # DynamicGNoise(14, std=0.05),
             nn.Conv2d(6, 16, 5, stride=1, padding=0),  # (b, 16, 10, 10)
             nn.ReLU(True),
-            nn.MaxPool2d(2, stride=2)  # (b, 16, 5, 5)
+            nn.AvgPool2d(2, stride=2)  # (b, 16, 5, 5)
         )
 
-        # Channelled features to hidden space
-        self.encoder_linear = nn.Sequential(
-            nn.Linear(400, 100),
-            nn.ReLU()
-        )
-
-        # Reconstruct channelled feature vectors via code
-        self.decoder_linear = nn.Sequential(
-            nn.Linear(100, 400),
-            nn.ReLU()
-        )
 
         # Decoder Network
         self.decoder_cnn = nn.Sequential(
             nn.ConvTranspose2d(16, 16, 2, stride=2),  # (b, 16, 10, 10)
             nn.ReLU(True),
-            nn.ConvTranspose2d(16, 6, 6, stride=2, padding=2),  # (b, 6, 16, 16)
+            nn.ConvTranspose2d(16, 6, 5, stride=1, padding=0),  # (b, 6, 14, 14)
             nn.ReLU(True),
-            nn.ConvTranspose2d(6, 3, 4, stride=2, padding=1),  # (b, 3, 32, 32)
+            nn.ConvTranspose2d(6, 1, 4, stride=2, padding=0),  # (b, 1, 32, 32)
             nn.Tanh()
         )
 
@@ -104,14 +95,15 @@ class LeNetAE32(nn.Module):
 
     def forward(self, x):
         code = self.encoder_cnn(x)
-        code = self.encoder_linear(code.flatten(start_dim=1))
+        code = code.flatten(start_dim=1)
+        # code = self.encoder_linear(code.flatten(start_dim=1))
 
-        code_rev = self.decoder_linear(code)
-        code_rev = code_rev.view(-1, 16, 5, 5)
+        # code_rev = self.decoder_linear(code)
+        # code_rev = code_rev.view(-1, 16, 5, 5)
+        code_rev = code.view(-1, 16, 5, 5)
         rec = self.decoder_cnn(code_rev)
-        # print(rec.shape)
 
-        rec = rec.view(-1, 28 * 28)
+        rec = rec.view(-1, 32 * 32)
         return code, rec
 
 

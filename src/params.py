@@ -18,16 +18,16 @@ source_data_set = "mnist"
 target_data_set = "svhn"
 
 # params for model training
-clf_train_iter = 100
-tag_train_iter = 40000
+clf_train_iter = 100        # Number of iterations to train the source domain AE + CLF
+tag_train_iter = 40000      # Number of iterations to perform the distribution fusion steps (One fusion each iteration)
 
-fusion_steps = 10
+fusion_steps = 10           # Parameter for early fusion version -- SUSPENDED
 
-g_steps = 1
-g_learning_rate = 1e-4
-d_steps = 2
-d_learning_rate = 1e-4
+g_steps = 1                 # Number of training step performed to Generator
+g_learning_rate = 1e-4      # Learning rate of each G update
+d_steps = 2                 # Number of training step performed to Discriminator
+d_learning_rate = 1e-4      # Learning rate of each D update
 
-num_disable_layer = 1
+num_disable_layer = 1       # Number of layer of target generator that is not trainable (share weight)
 
 

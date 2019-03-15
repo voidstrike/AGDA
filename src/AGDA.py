@@ -136,9 +136,9 @@ def main(load_model=False, hidden_dim=100):
     target_dis = Discriminator100() if hidden_dim == 100 else Discriminator400()
 
     if load_model:
-        source_ae.load_state_dict(torch.load(root_path + '/../modeinfo/source_ae.pt'))
+        source_ae.load_state_dict(torch.load(root_path + '/../modeinfo/source_ae_' + params.source_data_set + '.pt'))
         source_ae.eval()
-        source_clf.load_state_dict(torch.load(root_path + '/../modeinfo/source_clf.pt'))
+        source_clf.load_state_dict(torch.load(root_path + '/../modeinfo/source_clf_' + params.source_data_set + '.pt'))
         source_clf.eval()
 
     criterion_ae = nn.MSELoss(reduction='sum')      # General Loss of AE -- sum MSE
@@ -172,7 +172,7 @@ def main(load_model=False, hidden_dim=100):
                 loss_ae = criterion_ae(features, source_rec)
                 loss_clf = criterion_clf(label_predict, label)
                 floss = loss_ae + loss_clf
-                #floss = loss_clf
+                # floss = loss_clf
 
                 src_optimizer.zero_grad()
                 floss.backward()
@@ -189,8 +189,8 @@ def main(load_model=False, hidden_dim=100):
                   .format(step, ae_loss_iter / instance_count, clf_loss_iter / instance_count,
                           train_acc_iter / instance_count))
 
-        torch.save(source_ae.state_dict(), root_path + '/../modeinfo/source_ae.pt')
-        torch.save(source_clf.state_dict(), root_path + '/../modeinfo/source_clf.pt')
+        torch.save(source_ae.state_dict(), root_path + '/../modeinfo/source_ae_' + params.source_data_set + '.pt')
+        torch.save(source_clf.state_dict(), root_path + '/../modeinfo/source_clf_' + params.source_data_set + '.pt')
 
     # Show the performance of trained model in source domain, train & test set
     ae_loss_train, train_acc = getModelPerformance(source_train_data, source_ae, source_clf, criterion_ae)
@@ -249,7 +249,7 @@ def main(load_model=False, hidden_dim=100):
                 fake_loss = criterion_gan(dis_res_fake_code, fake_placeholder_fusion)
                 d_loss = (real_loss + fake_loss) / 2
                 
-                #print("R : {:.6f}, F : {:.6f}".format(real_loss.item(), fake_loss.item()))
+                # print("R : {:.6f}, F : {:.6f}".format(real_loss.item(), fake_loss.item()))
 
                 if d_step != params.d_steps - 1:
                     d_loss.backward(retain_graph=True)
@@ -268,8 +268,8 @@ def main(load_model=False, hidden_dim=100):
                 g_loss = criterion_gan(gen_res_fake_code, valid_placeholder_fusion)
                 ae_loss = criterion_ae(features, target_rec)
                 floss = g_loss + ae_loss
-                #floss = g_loss
-                #print(floss.item())
+                # floss = g_loss
+                # print(floss.item())
                 floss.backward()
 
                 optimizer_G.step()
