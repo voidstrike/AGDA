@@ -27,7 +27,13 @@ g_steps = 1                 # Number of training step performed to Generator
 g_learning_rate = 1e-4      # Learning rate of each G update
 d_steps = 2                 # Number of training step performed to Discriminator
 d_learning_rate = 1e-4      # Learning rate of each D update
+clf_learning_rate = 1e-3    # Learning rate of source classifier
 
 num_disable_layer = 1       # Number of layer of target generator that is not trainable (share weight)
+
+source_ae_weight = 1.       # The weight of ae loss during source training process
+source_clf_weight = 1.      # The weight of clf loss during source training process
+target_ae_weight = 1.       # The weight of ae loss during target training process
+target_fusion_weight = 1.   # The weight of domain fusion loss during target training process
 
 

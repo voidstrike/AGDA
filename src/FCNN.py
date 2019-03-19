@@ -38,8 +38,7 @@ class LinearClf400(nn.Module):
             nn.LeakyReLU(),
             nn.Linear(120, 84),
             nn.LeakyReLU(),
-            nn.Linear(84, 10),
-            #nn.Softmax(dim=1)
+            nn.Linear(84, 10)
         )
 
         # Initialize the weight via Xavier
@@ -62,8 +61,12 @@ class Discriminator100(nn.Module):
             nn.Linear(50, 16),
             nn.LeakyReLU(),
             nn.Linear(16, 1),
-            nn.Softmax(dim=1)
         )
+
+        # Initialize the weight via Xavier
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                init.xavier_uniform_(module.weight)
 
     def forward(self, img):
         validity = self.model(img)
@@ -80,10 +83,13 @@ class Discriminator400(nn.Module):
             nn.LeakyReLU(),
             nn.Linear(200, 200),
             nn.LeakyReLU(),
-            nn.Linear(200, 1),
-            # nn.Softmax(dim=1)
-            nn.Sigmoid()
+            nn.Linear(200, 1)
         )
+
+        # Initialize the weight via Xavier
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                init.xavier_uniform_(module.weight)
 
     def forward(self, img):
         validity = self.model(img)

@@ -21,18 +21,6 @@ class LeNetAE28(nn.Module):
             nn.AvgPool2d(2, stride=2)  # (b, 16, 5, 5)
         )
 
-        # Channelled features to hidden space
-        # self.encoder_linear = nn.Sequential(
-        #     nn.Linear(400, 100),
-        #     nn.ReLU()
-        # )
-
-        # Reconstruct channelled feature vectors via code
-        # self.decoder_linear = nn.Sequential(
-        #     nn.Linear(100, 400),
-        #     nn.ReLU()
-        # )
-
         # Decoder Network
         self.decoder_cnn = nn.Sequential(
             nn.ConvTranspose2d(16, 16, 2, stride=2),  # (b, 16, 10, 10)
@@ -49,16 +37,22 @@ class LeNetAE28(nn.Module):
 
     def forward(self, x):
         code = self.encoder_cnn(x)
+        rec = self.decoder_cnn(code)
+
+        # Modified the shape of each return tensor
         code = code.flatten(start_dim=1)
-        # code = self.encoder_linear(code.flatten(start_dim=1))
-
-        # code_rev = self.decoder_linear(code)
-        # code_rev = code_rev.view(-1, 16, 5, 5)
-        code_rev = code.view(-1, 16, 5, 5)
-        rec = self.decoder_cnn(code_rev)
-
         rec = rec.view(-1, 28 * 28)
+
         return code, rec
+
+    # Auxiliary function that controls how many layers are not trainable
+    def setPartialTrainable(self, num_layer=0):
+        if num_layer != 0:
+            ct = 0
+            for eachLayer in self.encoder_cnn:
+                if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
+                    eachLayer.requires_grad = False
+                    ct += 1
 
 
 class LeNetAE32(nn.Module):
@@ -77,7 +71,6 @@ class LeNetAE32(nn.Module):
             nn.AvgPool2d(2, stride=2)  # (b, 16, 5, 5)
         )
 
-
         # Decoder Network
         self.decoder_cnn = nn.Sequential(
             nn.ConvTranspose2d(16, 16, 2, stride=2),  # (b, 16, 10, 10)
@@ -88,30 +81,38 @@ class LeNetAE32(nn.Module):
             nn.Tanh()
         )
 
+        # Default Initialize Process -- Xavier initialization
         for module in self.modules():
             if isinstance(module, nn.Conv2d) or isinstance(module, nn.ConvTranspose2d):
                 init.xavier_uniform_(module.weight)
 
-
     def forward(self, x):
         code = self.encoder_cnn(x)
+        rec = self.decoder_cnn(code)
+
+        # Modified the sharp of each return tensor
         code = code.flatten(start_dim=1)
-        # code = self.encoder_linear(code.flatten(start_dim=1))
-
-        # code_rev = self.decoder_linear(code)
-        # code_rev = code_rev.view(-1, 16, 5, 5)
-        code_rev = code.view(-1, 16, 5, 5)
-        rec = self.decoder_cnn(code_rev)
-
         rec = rec.view(-1, 32 * 32)
         return code, rec
+
+    # Auxiliary function that controls how many layers are not trainable
+    def setPartialTrainable(self, num_layer=0):
+        if num_layer != 0:
+            ct = 0
+            for eachLayer in self.encoder_cnn:
+                if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
+                    eachLayer.requires_grad = False
+                    ct += 1
 
 
 class DynamicGNoise(nn.Module):
     def __init__(self, shape, std=0.05):
         super(DynamicGNoise, self).__init__()
-        self.noise = Variable(torch.zeros(shape, shape).cuda())
-        #  self.noise = Variable(torch.zeros(shape, shape))
+
+        self.noise = Variable(torch.zeros(shape, shape))
+        if torch.cuda.is_available():
+            self.noise = self.noise.cuda()
+
         self.std = std
 
     def forward(self, x):
@@ -119,5 +120,4 @@ class DynamicGNoise(nn.Module):
             return x
 
         self.noise.data.normal_(0, std=self.std)
-        #print(x.size(), self.noise.size())
         return x + self.noise.expand_as(x)

@@ -1,5 +1,6 @@
 from torch import nn
 from torch.nn import init
+import torch
 
 
 # Linear AE class
@@ -64,6 +65,15 @@ class LinearAE(nn.Module):
         code = self.encoder(x)
         rec = self.decoder(code)
         return code, rec
+
+    # Auxiliary function that controls how many layers are not trainable
+    def setPartialTrainable(self, num_layer=0):
+        if num_layer != 0:
+            ct = 0
+            for eachLayer in self.encoder_cnn:
+                if isinstance(eachLayer, torch.nn.Linear) and ct < num_layer:
+                    eachLayer.requires_grad = False
+                    ct += 1
 
 
 def main():
