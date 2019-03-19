@@ -124,7 +124,7 @@ def main(load_model=False, hidden_dim=100):
         target_dis = Discriminator100()
     elif hidden_dim == 400:
         source_clf = LinearClf400()
-        target_dis = Discriminator400
+        target_dis = Discriminator400()
 
     if load_model:
         source_ae.load_state_dict(torch.load(root_path + '/../modeinfo/source_ae_' + params.source_data_set + '.pt'))
