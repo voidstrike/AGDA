@@ -50,9 +50,65 @@ class LeNetAE28(nn.Module):
         if num_layer != 0:
             ct = 0
             for eachLayer in self.encoder_cnn:
-                if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
-                    eachLayer.requires_grad = False
-                    ct += 1
+                if isinstance(eachLayer, torch.nn.Conv2d):
+                    if ct < num_layer:
+                        eachLayer.requires_grad = False
+                        ct += 1
+                    else:
+                        init.xavier_uniform_(eachLayer.weight)
+
+
+# Convolution Auto Encoder
+class ExLeNetAE28(nn.Module):
+    def __init__(self):
+        super(ExLeNetAE28, self).__init__()
+
+        # Encoder Network
+        self.encoder_cnn = nn.Sequential(
+            # DynamicGNoise(28, std=0.05),
+            nn.Conv2d(1, 20, 5, stride=1),  # (b, 20, 24, 24)
+            nn.ReLU(),
+            nn.MaxPool2d(2, stride=2),  # (b, 20, 12, 12)
+            # DynamicGNoise(12, std=0.05),
+            nn.Conv2d(20, 50, 5, stride=1),  # (b, 50, 8, 8)
+            nn.ReLU(),
+            nn.MaxPool2d(2, stride=2)  # (b, 16, 4, 4)
+        )
+
+        # Decoder Network
+        self.decoder_cnn = nn.Sequential(
+            nn.ConvTranspose2d(50, 20, 5, stride=3, padding=1),  # (b, 20, 12, 12)
+            nn.ReLU(True),
+            nn.ConvTranspose2d(20, 1, 4, stride=2, padding=1),  # (b, 1, 28, 28)
+            nn.ReLU(True),
+            nn.Tanh()
+        )
+
+        for module in self.modules():
+            if isinstance(module, nn.Conv2d) or isinstance(module, nn.ConvTranspose2d):
+                init.xavier_uniform_(module.weight)
+
+    def forward(self, x):
+        code = self.encoder_cnn(x)
+        rec = self.decoder_cnn(code)
+
+        # Modified the shape of each return tensor
+        code = code.flatten(start_dim=1)
+        rec = rec.view(-1, 28 * 28)
+
+        return code, rec
+
+    # Auxiliary function that controls how many layers are not trainable
+    def setPartialTrainable(self, num_layer=0):
+        if num_layer != 0:
+            ct = 0
+            for eachLayer in self.encoder_cnn:
+                if isinstance(eachLayer, torch.nn.Conv2d):
+                    if ct < num_layer:
+                        eachLayer.requires_grad = False
+                        ct += 1
+                    else:
+                        init.xavier_uniform_(eachLayer.weight)
 
 
 class LeNetAE32(nn.Module):
@@ -100,9 +156,12 @@ class LeNetAE32(nn.Module):
         if num_layer != 0:
             ct = 0
             for eachLayer in self.encoder_cnn:
-                if isinstance(eachLayer, torch.nn.Conv2d) and ct < num_layer:
-                    eachLayer.requires_grad = False
-                    ct += 1
+                if isinstance(eachLayer, torch.nn.Conv2d):
+                    if ct < num_layer:
+                        eachLayer.requires_grad = False
+                        ct += 1
+                    else:
+                        init.xavier_uniform_(eachLayer.weight)
 
 
 class DynamicGNoise(nn.Module):

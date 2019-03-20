@@ -13,8 +13,9 @@ from torch import nn
 from copy import deepcopy
 
 from LinearAE import LinearAE
-from ConvAE import LeNetAE28, LeNetAE32
+from ConvAE import LeNetAE28, ExLeNetAE28
 from FCNN import LinearClf100, Discriminator100, LinearClf400, Discriminator400
+from FCNN import LinearClf800, Discriminator800
 from usps import USPS
 from GSVHN import GSVHN
 
@@ -118,13 +119,17 @@ def main(load_model=False, hidden_dim=100):
     target_test_data, _ = getDataLoader(params.target_data_set, root_path, False)
 
     # Initialize source classifier and target discriminator
-    source_ae = LeNetAE28()
+    # source_ae = LeNetAE28()
+    source_ae = ExLeNetAE28()
     if hidden_dim == 100:
         source_clf = LinearClf100()
         target_dis = Discriminator100()
     elif hidden_dim == 400:
         source_clf = LinearClf400()
         target_dis = Discriminator400()
+    elif hidden_dim == 800:
+        source_clf = LinearClf800()
+        target_dis = Discriminator800()
 
     if load_model:
         source_ae.load_state_dict(torch.load(root_path + '/../modeinfo/source_ae_' + params.source_data_set + '.pt'))
