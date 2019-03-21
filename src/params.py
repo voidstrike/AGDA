@@ -7,6 +7,7 @@ data_root = "data"
 batch_size = 128
 fusion_size = 256
 image_size = 64
+dim_set = [100, 400, 800]
 
 # params for target dataset
 tgt_dataset = "USPS"

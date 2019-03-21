@@ -106,7 +106,7 @@ o_tfs = tfs.Compose([
 
 
 def main(load_model=False, hidden_dim=100):
-    if hidden_dim != 100 and hidden_dim != 400:
+    if hidden_dim not in params.dim_set:
         raise Exception("Unsupported Hidden Dimension")
     root_path = os.getcwd()
 
