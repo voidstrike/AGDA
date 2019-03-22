@@ -141,7 +141,9 @@ def main(load_model=False, hidden_dim=100):
     criterion_clf = nn.CrossEntropyLoss()           # General Loss of classifier -- CEL
     criterion_gan = nn.BCEWithLogitsLoss()          # Auxiliary loss for GAN (Discriminator)
 
-    src_optimizer = torch.optim.Adam(list(source_ae.parameters()) + list(source_clf.parameters()), lr=params.clf_learning_rate)
+    src_optimizer = torch.optim.Adam(list(source_ae.parameters()) + list(source_clf.parameters()),
+                                     lr=params.clf_learning_rate,
+                                     weight_decay=2.5e-5)
 
     if torch.cuda.is_available():
         source_ae = source_ae.cuda()

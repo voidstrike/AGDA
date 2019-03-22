@@ -59,6 +59,8 @@ class LinearClf800(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(800, 500),
             nn.LeakyReLU(),
+            nn.Linear(500, 500),
+            nn.LeakyReLU(),
             nn.Linear(500, 10)
         )
 
