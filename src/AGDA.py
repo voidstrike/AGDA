@@ -29,6 +29,26 @@ def forwardByModelType(in_model, in_vec, psize=28, pchannel=1):
     return code, rec
 
 
+# Auxiliary function that return corresponding model
+def getModelByDimension(t_dim):
+    ae, clf, dis = None, None, None
+
+    if t_dim == 100:
+        clf = LinearClf100()
+        dis = Discriminator100()
+        ae = LeNetAE28()
+    elif t_dim == 400:
+        clf = LinearClf400()
+        dis = Discriminator400()
+        ae = LeNetAE28()
+    elif t_dim == 800:
+        clf = LinearClf800()
+        dis = Discriminator800()
+        ae = ExLeNetAE28()
+
+    return ae, clf, dis
+
+
 # Auxiliary function that return the number of correct prediction
 def getHitCount(tlabel, plabel):
     _, plabel = plabel.max(1)
@@ -137,16 +157,7 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
 
     # Initialize source classifier and target discriminator
     # source_ae = LeNetAE28()
-    source_ae = ExLeNetAE28()
-    if hidden_dim == 100:
-        source_clf = LinearClf100()
-        target_dis = Discriminator100()
-    elif hidden_dim == 400:
-        source_clf = LinearClf400()
-        target_dis = Discriminator400()
-    elif hidden_dim == 800:
-        source_clf = LinearClf800()
-        target_dis = Discriminator800()
+    source_ae, source_clf, target_dis = getModelByDimension(hidden_dim)
 
     if load_model:
         source_ae.load_state_dict(torch.load(root_path + '/../modeinfo/source_ae_' + params.source_data_set + '.pt'))
