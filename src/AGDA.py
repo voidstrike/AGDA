@@ -86,6 +86,23 @@ def getDataLoader(ds_name, root_path, train=True):
     return target_dl, target_dl_fusion
 
 
+def getMMD(sdl, tdl, sm, tm, hd):
+    s_mean = getDisMean(sdl, sm, hd)
+    t_mean = getDisMean(tdl, tm, hd)
+    res = (s_mean - t_mean) ** 2
+    return res.sum().item()
+
+
+def getDisMean(data_loader, tfs_model, h_dim):
+    res = torch.zeros(1, h_dim)
+    instance_count = 0.
+    for feature, _ in data_loader:
+        instance_count += feature.shape[0]
+        ex_feature, _ = tfs_model(feature)
+        res += ex_feature.sum(dim=-2)
+    return res / instance_count
+
+
 # Auxiliary function that convert tensor back to img
 def to_img(x):
     x = 0.5 * (x + 1.)
@@ -105,7 +122,7 @@ o_tfs = tfs.Compose([
 ])
 
 
-def main(load_model=False, hidden_dim=100):
+def main(load_model=False, hidden_dim=100, cuda_flag=False):
     if hidden_dim not in params.dim_set:
         raise Exception("Unsupported Hidden Dimension")
     root_path = os.getcwd()
@@ -145,7 +162,7 @@ def main(load_model=False, hidden_dim=100):
                                      lr=params.clf_learning_rate,
                                      weight_decay=2.5e-5)
 
-    if torch.cuda.is_available():
+    if cuda_flag:
         source_ae = source_ae.cuda()
         source_clf = source_clf.cuda()
 
@@ -156,7 +173,7 @@ def main(load_model=False, hidden_dim=100):
             ae_loss_iter, clf_loss_iter, train_acc_iter = .0, .0, .0
 
             for features, label in source_train_data:
-                if torch.cuda.is_available():
+                if cuda_flag:
                     features = Variable(features.view(features.shape[0], -1).cuda())
                     label = Variable(label.cuda())
 
@@ -206,7 +223,7 @@ def main(load_model=False, hidden_dim=100):
     fake_placeholder_fusion = Variable(torch.from_numpy(np.zeros((params.fusion_size, 1), dtype='float32')),
                                 requires_grad=False)
 
-    if torch.cuda.is_available():
+    if cuda_flag:
         target_ae = target_ae.cuda()
         target_dis = target_dis.cuda()
         valid_placeholder_fusion = valid_placeholder_fusion.cuda()
@@ -218,14 +235,14 @@ def main(load_model=False, hidden_dim=100):
     tmp_log = open(root_path + "/../log/experiment_log_" + currentDT + ".txt", 'w')
     for step in range(params.tag_train_iter):
         for features, _ in target_train_data_fusion:
-            if torch.cuda.is_available():
+            if cuda_flag:
                 features = Variable(features.view(features.shape[0], -1).cuda())
             else:
                 features = Variable(features.view(features.shape[0], -1))
 
             real_code = None
             for s_feature, _ in source_train_data_fusion:
-                if torch.cuda.is_available():
+                if cuda_flag:
                     s_feature = s_feature.cuda()
                 real_code, _ = forwardByModelType(source_ae, s_feature)
             assert real_code is not None
@@ -273,6 +290,10 @@ def main(load_model=False, hidden_dim=100):
                 .format(step, ae_loss_train, train_acc, ae_loss_test, test_acc))
             tmp_log.write('{}, {:.6f}, {:.6f}, {:.6f}, {:.6f}\n'.format(step, ae_loss_train, train_acc, ae_loss_test, test_acc))
 
+            # Auxiliary metric -- MMD
+            c_mmd = getMMD(source_test_data, source_ae, target_test_data, target_ae, hidden_dim)
+            print('Current MMD is: {:.6f}'.format(c_mmd))
+
     tmp_log.close()
 
 
@@ -282,5 +303,6 @@ if __name__ == '__main__':
     if len(sys.argv) > 2:
         load_flag = bool(sys.argv[1] == 'True')
         hidden_dim = int(sys.argv[2])
+    cuda_flag = torch.cuda.is_available()
 
-    main(load_flag, hidden_dim)
+    main(load_flag, hidden_dim, cuda_flag)
