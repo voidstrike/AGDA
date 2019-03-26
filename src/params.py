@@ -19,8 +19,8 @@ source_data_set = "mnist"
 target_data_set = "svhn"
 
 # params for model training
-clf_train_iter = 100        # Number of iterations to train the source domain AE + CLF
-tag_train_iter = 40000      # Number of iterations to perform the distribution fusion steps (One fusion each iteration)
+clf_train_iter = 1          # Number of iterations to train the source domain AE + CLF
+tag_train_iter = 1          # Number of iterations to perform the distribution fusion steps (One fusion each iteration)
 
 fusion_steps = 10           # Parameter for early fusion version -- SUSPENDED
 

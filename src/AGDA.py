@@ -99,7 +99,7 @@ def getDataLoader(ds_name, root_path, train=True):
     else:
         raise Exception("Unsupported Dataset")
 
-    r_sampler = RandomSampler(data_set, replacement=True, num_samples=params.fusion_size)
+    r_sampler = RandomSampler(data_set, replacement=False)
     target_dl = DataLoader(data_set, batch_size=params.batch_size, shuffle=True)
     if train:
         target_dl_fusion = DataLoader(data_set, sampler=r_sampler, batch_size=params.fusion_size)
@@ -231,67 +231,60 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
     optimizer_G = torch.optim.Adam(target_ae.parameters(), lr=params.g_learning_rate)
     optimizer_D = torch.optim.Adam(target_dis.parameters(), lr=params.d_learning_rate)
 
-    valid_placeholder_fusion = Variable(torch.from_numpy(np.ones((params.fusion_size, 1), dtype='float32')),
-                                 requires_grad=False)
-    fake_placeholder_fusion = Variable(torch.from_numpy(np.zeros((params.fusion_size, 1), dtype='float32')),
-                                requires_grad=False)
-
     if cuda_flag:
         target_ae = target_ae.cuda()
         target_dis = target_dis.cuda()
-        valid_placeholder_fusion = valid_placeholder_fusion.cuda()
-        fake_placeholder_fusion = fake_placeholder_fusion.cuda()
 
     # Train target AE and Discriminator
     currentDT = datetime.datetime.now()
     currentDT = str(currentDT.strftime("%m-%d-%H-%M"))
     tmp_log = open(root_path + "/../log/experiment_log_" + currentDT + ".txt", 'w')
     for step in range(params.tag_train_iter):
-        for features, _ in target_train_data_fusion:
+        data_zip = enumerate(zip(source_train_data_fusion, target_train_data_fusion))
+        for _, ((src_f, _), (tgt_f, _)) in data_zip:
             if cuda_flag:
-                features = Variable(features.view(features.shape[0], -1).cuda())
+                src_f = Variable(src_f.view(src_f.shape[0], -1).cuda())
+                src_valid = Variable(torch.ones(src_f.size(0), 1, dtype=torch.float32)).cuda()
+                tgt_f = Variable(tgt_f.view(tgt_f.shape[0], -1).cuda())
+                tgt_valid = Variable(torch.ones(tgt_f.size(0), 1, dtype=torch.float32)).cuda()
+                tgt_fake = Variable(torch.zeros(tgt_f.size(0), 1, dtype=torch.float32)).cuda()
             else:
-                features = Variable(features.view(features.shape[0], -1))
+                src_f = Variable(src_f.view(src_f.shape[0], -1))
+                src_valid = Variable(torch.ones(src_f.size(0), 1, dtype=torch.float32))
+                tgt_f = Variable(tgt_f.view(tgt_f.shape[0], -1))
+                tgt_valid = Variable(torch.ones(tgt_f.size(0), 1, dtype=torch.float32))
+                tgt_fake = Variable(torch.zeros(tgt_f.size(0), 1, dtype=torch.float32))
 
-            real_code = None
-            for s_feature, _ in source_train_data_fusion:
-                if cuda_flag:
-                    s_feature = s_feature.cuda()
-                real_code, _ = forwardByModelType(source_ae, s_feature)
-            assert real_code is not None
+            src_code, src_rec = forwardByModelType(source_ae, src_f)
+            tgt_code, tgt_rec = forwardByModelType(source_ae, tgt_f)
 
-            # Train Discriminator k times
-            fake_code, _ = forwardByModelType(target_ae, features)
             for d_step in range(params.d_steps):
                 optimizer_D.zero_grad()
-                
-                dis_res_real_code = target_dis(real_code)
-                dis_res_fake_code = target_dis(fake_code)
 
-                real_loss = criterion_gan(dis_res_real_code, valid_placeholder_fusion)
-                fake_loss = criterion_gan(dis_res_fake_code, fake_placeholder_fusion)
-                d_loss = (real_loss + fake_loss) / 2
+                src_domain_label = target_dis(src_code)
+                tgt_domain_label = target_dis(tgt_code)
+
+                loss_src_dis = criterion_gan(src_domain_label, src_valid)
+                loss_tgt_dis = criterion_gan(tgt_domain_label, tgt_fake)
+                d_loss = (loss_src_dis + loss_tgt_dis) / 2
 
                 if d_step != params.d_steps - 1:
                     d_loss.backward(retain_graph=True)
-                else:    
+                else:
                     d_loss.backward()
 
                 optimizer_D.step()
 
-            # Train Generator & Decoder k' times
             for g_step in range(params.g_steps):
-                target_code, target_rec = forwardByModelType(target_ae, features)
+                tgt_code, tgt_rec = forwardByModelType(source_ae, tgt_f)
+                tgt_domain_label = target_dis(tgt_code)
 
-                optimizer_G.zero_grad()
-                gen_res_fake_code = target_dis(target_code)
+                loss_tgt_rec = criterion_ae(tgt_f, tgt_rec)
+                loss_tgt_gen = criterion_gan(tgt_domain_label, tgt_valid)
 
-                g_loss = criterion_gan(gen_res_fake_code, valid_placeholder_fusion)
-                ae_loss = criterion_ae(features, target_rec)
+                loss_total = params.target_ae_weight * loss_tgt_rec + params.target_fusion_weight * loss_tgt_gen
 
-                floss = params.target_fusion_weight * g_loss + params.target_ae_weight * ae_loss
-                floss.backward()
-
+                loss_total.backward()
                 optimizer_G.step()
 
         # Test the accuracy after this iteration
