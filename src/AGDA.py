@@ -116,6 +116,7 @@ def getMMD(sdl, sm, tdl, tm, hd):
 
 def getDisMean(data_loader, tfs_model, h_dim):
     res = torch.zeros(1, h_dim)
+    res = res.cuda() if torch.cuda.is_available() else res
     instance_count = 0.
     for feature, _ in data_loader:
         feature = feature.cuda() if torch.cuda.is_available() else feature
@@ -288,17 +289,17 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
                 optimizer_G.step()
 
         # Test the accuracy after this iteration
-        if step % 200 == 0:
-            ae_loss_train, train_acc = getModelPerformance(target_train_data, target_ae, source_clf, criterion_ae)
-            ae_loss_test, test_acc = getModelPerformance(target_test_data, target_ae, source_clf, criterion_ae)
+        ae_loss_train, train_acc = getModelPerformance(target_train_data, target_ae, source_clf, criterion_ae)
+        ae_loss_test, test_acc = getModelPerformance(target_test_data, target_ae, source_clf, criterion_ae)
 
-            print('Epoch: {}, AE Loss train: {:.6f}, Clf Acc Train: {:.6f}, AE Loss Target: {:.6f}, Clf Acc Target: {:.6f}'
-                .format(step, ae_loss_train, train_acc, ae_loss_test, test_acc))
-            tmp_log.write('{}, {:.6f}, {:.6f}, {:.6f}, {:.6f}\n'.format(step, ae_loss_train, train_acc, ae_loss_test, test_acc))
+        print('Epoch: {}, AE Loss train: {:.6f}, Clf Acc Train: {:.6f}, AE Loss Target: {:.6f}, Clf Acc Target: {:.6f}'
+              .format(step, ae_loss_train, train_acc, ae_loss_test, test_acc))
+        tmp_log.write(
+            '{}, {:.6f}, {:.6f}, {:.6f}, {:.6f}\n'.format(step, ae_loss_train, train_acc, ae_loss_test, test_acc))
 
-            # Auxiliary metric -- MMD
-            c_mmd = getMMD(source_test_data, source_ae, target_test_data, target_ae, hidden_dim)
-            print('Current MMD is: {:.6f}'.format(c_mmd))
+        # Auxiliary metric -- MMD
+        c_mmd = getMMD(source_test_data, source_ae, target_test_data, target_ae, hidden_dim)
+        print('Current MMD is: {:.6f}'.format(c_mmd))
 
     tmp_log.close()
 
