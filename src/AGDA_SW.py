@@ -116,6 +116,7 @@ def getMMD(sdl, sm, tdl, tm, hd):
 
 def getDisMean(data_loader, tfs_model, h_dim):
     res = torch.zeros(1, h_dim)
+    res = res.cuda() if torch.cuda.is_available() else res
     instance_count = 0.
     for feature, _ in data_loader:
         feature = feature.cuda() if torch.cuda.is_available() else feature
@@ -171,9 +172,10 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
     criterion_clf = nn.CrossEntropyLoss()           # General Loss of classifier -- CEL
     criterion_gan = nn.BCEWithLogitsLoss()          # Auxiliary loss for GAN (Discriminator)
 
-    src_optimizer = torch.optim.Adam(list(source_ae.parameters()) + list(source_clf.parameters()),
+    optimizer_G = torch.optim.Adam(list(source_ae.parameters()) + list(source_clf.parameters()),
                                      lr=params.clf_learning_rate,
                                      weight_decay=2.5e-5)
+    optimizer_D = torch.optim.Adam(target_dis.parameters(), lr=params.d_learning_rate)
 
     if cuda_flag:
         source_ae = source_ae.cuda()
@@ -181,141 +183,77 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
 
     if not load_model:
         # Train AE & CLF from scratch
-        instance_count = source_train_data.dataset.__len__()
         for step in range(params.clf_train_iter):
-            ae_loss_iter, clf_loss_iter, train_acc_iter = .0, .0, .0
-
-            for features, label in source_train_data:
+            data_zip = enumerate(zip(source_train_data, target_train_data))
+            for _, ((src_f, src_l), (tgt_f, _)) in data_zip:
                 if cuda_flag:
-                    features = Variable(features.view(features.shape[0], -1).cuda())
-                    label = Variable(label.cuda())
-
+                    src_f = Variable(src_f.view(src_f.shape[0], -1).cuda())
+                    src_valid = Variable(torch.ones(src_f.size(0), 1, dtype=torch.float32)).cuda()
+                    tgt_f = Variable(tgt_f.view(tgt_f.shape[0], -1).cuda())
+                    tgt_valid = Variable(torch.ones(tgt_f.size(0), 1, dtype=torch.float32)).cuda()
+                    tgt_fake = Variable(torch.zeros(tgt_f.size(0), 1, dtype=torch.float32)).cuda()
+                    src_l = Variable(src_l.cuda())
                 else:
-                    features = Variable(features.view(features.shape[0], -1))
-                    label = Variable(label)
+                    src_f = Variable(src_f.view(src_f.shape[0], -1))
+                    src_valid = Variable(torch.ones(src_f.size(0), 1, dtype=torch.float32))
+                    tgt_f = Variable(tgt_f.view(tgt_f.shape[0], -1))
+                    tgt_valid = Variable(torch.ones(tgt_f.size(0), 1, dtype=torch.float32))
+                    tgt_fake = Variable(torch.zeros(tgt_f.size(0), 1, dtype=torch.float32))
+                    src_l = Variable(src_l)
 
-                source_code, source_rec = forwardByModelType(source_ae, features)
-                label_predict = source_clf(source_code)
+                src_code, src_rec = forwardByModelType(source_ae, src_f)
+                tgt_code, tgt_rec = forwardByModelType(source_ae, tgt_f)
 
-                loss_ae = criterion_ae(features, source_rec)
-                loss_clf = criterion_clf(label_predict, label)
-                floss = params.source_ae_weight * loss_ae + params.source_clf_weight * loss_clf
+                for d_step in range(params.d_steps):
+                    optimizer_D.zero_grad()
 
-                src_optimizer.zero_grad()
-                floss.backward()
-                src_optimizer.step()
+                    src_domain_label = target_dis(src_code)
+                    tgt_domain_label = target_dis(tgt_code)
 
-                ae_loss_iter += loss_ae.item()
-                clf_loss_iter += loss_clf.item()
+                    loss_src_dis = criterion_gan(src_domain_label, src_valid)
+                    loss_tgt_dis = criterion_gan(tgt_domain_label, tgt_fake)
+                    d_loss = (loss_src_dis + loss_tgt_dis) / 2
 
-                train_acc_iter += getHitCount(label, label_predict)
+                    if d_step != params.d_steps - 1:
+                        d_loss.backward(retain_graph=True)
+                    else:
+                        d_loss.backward()
 
-            print('Epoch: {}, AutoEncoder Loss: {:.6f}, Classifier Loss: {:.6f}, Train Acc: {:.6f}'
-                  .format(step, ae_loss_iter / instance_count, clf_loss_iter / instance_count,
-                          train_acc_iter / instance_count))
+                    optimizer_D.step()
+
+                for g_step in range(params.g_steps):
+                    src_code, src_rec = forwardByModelType(source_ae, src_f)
+                    tgt_code, tgt_rec = forwardByModelType(source_ae, tgt_f)
+                    tgt_domain_label = target_dis(tgt_code)
+                    label_predict = source_clf(src_code)
+
+                    loss_src_rec = criterion_ae(src_f, src_rec)
+                    loss_tgt_rec = criterion_ae(tgt_f, tgt_rec)
+                    loss_src_clf = criterion_clf(label_predict, src_l)
+                    loss_tgt_gen = criterion_gan(tgt_domain_label, tgt_valid)
+
+                    loss_total = loss_src_rec + loss_tgt_rec + loss_src_clf + loss_tgt_gen
+
+                    loss_total.backward()
+                    optimizer_G.step()
+
+            ae_loss_train, train_acc = getModelPerformance(target_train_data, source_ae, source_clf, criterion_ae)
+            ae_loss_test, test_acc = getModelPerformance(target_test_data, source_ae, source_clf, criterion_ae)
+
+            print(
+                'Epoch: {}, AE Loss train: {:.6f}, Clf Acc Train: {:.6f}, AE Loss Target: {:.6f}, Clf Acc Target: {:.6f}'
+                .format(step, ae_loss_train, train_acc, ae_loss_test, test_acc))
 
         torch.save(source_ae.state_dict(), root_path + '/../modeinfo/source_ae_' + params.source_data_set + '.pt')
         torch.save(source_clf.state_dict(), root_path + '/../modeinfo/source_clf_' + params.source_data_set + '.pt')
 
-    # Show the performance of trained model in source domain, train & test set
-    ae_loss_train, train_acc = getModelPerformance(source_train_data, source_ae, source_clf, criterion_ae)
-    ae_loss_test, test_acc = getModelPerformance(source_test_data, source_ae, source_clf, criterion_ae)
-
-    print('Trained Model AE Loss train: {:.6f}, Clf Acc Train: {:.6f}, AE Loss Target: {:.6f}, Clf Acc Target: {:.6f}'
-          .format(ae_loss_train, train_acc, ae_loss_test, test_acc))
-
-    # Models for target domain
-    target_ae = deepcopy(source_ae)  # Copy from Source AE -- Fine tuning method
-    target_ae.setPartialTrainable(params.num_disable_layer)
-
-    optimizer_G = torch.optim.Adam(target_ae.parameters(), lr=params.g_learning_rate)
-    optimizer_D = torch.optim.Adam(target_dis.parameters(), lr=params.d_learning_rate)
-
-    valid_placeholder_fusion = Variable(torch.from_numpy(np.ones((params.fusion_size, 1), dtype='float32')),
-                                 requires_grad=False)
-    fake_placeholder_fusion = Variable(torch.from_numpy(np.zeros((params.fusion_size, 1), dtype='float32')),
-                                requires_grad=False)
-
-    if cuda_flag:
-        target_ae = target_ae.cuda()
-        target_dis = target_dis.cuda()
-        valid_placeholder_fusion = valid_placeholder_fusion.cuda()
-        fake_placeholder_fusion = fake_placeholder_fusion.cuda()
-
-    # Train target AE and Discriminator
-    currentDT = datetime.datetime.now()
-    currentDT = str(currentDT.strftime("%m-%d-%H-%M"))
-    tmp_log = open(root_path + "/../log/experiment_log_" + currentDT + ".txt", 'w')
-    for step in range(params.tag_train_iter):
-        for features, _ in target_train_data_fusion:
-            if cuda_flag:
-                features = Variable(features.view(features.shape[0], -1).cuda())
-            else:
-                features = Variable(features.view(features.shape[0], -1))
-
-            real_code = None
-            for s_feature, _ in source_train_data_fusion:
-                if cuda_flag:
-                    s_feature = s_feature.cuda()
-                real_code, _ = forwardByModelType(source_ae, s_feature)
-            assert real_code is not None
-
-            # Train Discriminator k times
-            fake_code, _ = forwardByModelType(target_ae, features)
-            for d_step in range(params.d_steps):
-                optimizer_D.zero_grad()
-                
-                dis_res_real_code = target_dis(real_code)
-                dis_res_fake_code = target_dis(fake_code)
-
-                real_loss = criterion_gan(dis_res_real_code, valid_placeholder_fusion)
-                fake_loss = criterion_gan(dis_res_fake_code, fake_placeholder_fusion)
-                d_loss = (real_loss + fake_loss) / 2
-
-                if d_step != params.d_steps - 1:
-                    d_loss.backward(retain_graph=True)
-                else:    
-                    d_loss.backward()
-
-                optimizer_D.step()
-
-            # Train Generator & Decoder k' times
-            for g_step in range(params.g_steps):
-                target_code, target_rec = forwardByModelType(target_ae, features)
-
-                optimizer_G.zero_grad()
-                gen_res_fake_code = target_dis(target_code)
-
-                g_loss = criterion_gan(gen_res_fake_code, valid_placeholder_fusion)
-                ae_loss = criterion_ae(features, target_rec)
-
-                floss = params.target_fusion_weight * g_loss + params.target_ae_weight * ae_loss
-                floss.backward()
-
-                optimizer_G.step()
-
-        # Test the accuracy after this iteration
-        if step % 200 == 0:
-            ae_loss_train, train_acc = getModelPerformance(target_train_data, target_ae, source_clf, criterion_ae)
-            ae_loss_test, test_acc = getModelPerformance(target_test_data, target_ae, source_clf, criterion_ae)
-
-            print('Epoch: {}, AE Loss train: {:.6f}, Clf Acc Train: {:.6f}, AE Loss Target: {:.6f}, Clf Acc Target: {:.6f}'
-                .format(step, ae_loss_train, train_acc, ae_loss_test, test_acc))
-            tmp_log.write('{}, {:.6f}, {:.6f}, {:.6f}, {:.6f}\n'.format(step, ae_loss_train, train_acc, ae_loss_test, test_acc))
-
-            # Auxiliary metric -- MMD
-            c_mmd = getMMD(source_test_data, source_ae, target_test_data, target_ae, hidden_dim)
-            print('Current MMD is: {:.6f}'.format(c_mmd))
-
-    tmp_log.close()
-
 
 if __name__ == '__main__':
     load_flag = False
-    hidden_dim = 100
+    hd = 100
     if len(sys.argv) > 2:
         load_flag = bool(sys.argv[1] == 'True')
-        hidden_dim = int(sys.argv[2])
+        hd = int(sys.argv[2])
     cuda_flag = torch.cuda.is_available()
 
-    main(load_flag, hidden_dim, cuda_flag)
+    main(False, hd, cuda_flag)
