@@ -34,6 +34,7 @@ def getModelByDimension(t_dim):
     ae, clf, dis = None, None, None
 
     if t_dim == 100:
+        # TODO -- dim 100 doesn't work for now
         clf = LinearClf100()
         dis = Discriminator100()
         ae = LeNetAE28()

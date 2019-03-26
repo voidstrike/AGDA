@@ -79,7 +79,7 @@ class ExLeNetAE28(nn.Module):
         self.decoder_cnn = nn.Sequential(
             nn.ConvTranspose2d(50, 20, 5, stride=3, padding=1),  # (b, 20, 12, 12)
             nn.ReLU(True),
-            nn.ConvTranspose2d(20, 1, 4, stride=2, padding=1),  # (b, 1, 28, 28)
+            nn.ConvTranspose2d(20, 1, 6, stride=2, padding=0),  # (b, 1, 28, 28)
             nn.ReLU(True),
             nn.Tanh()
         )
