@@ -60,7 +60,7 @@ class LeNetAE28(nn.Module):
 
 # Convolution Auto Encoder
 class ExLeNetAE28(nn.Module):
-    def __init__(self):
+    def __init__(self, exl_flag=False):
         super(ExLeNetAE28, self).__init__()
 
         # Encoder Network
@@ -73,6 +73,13 @@ class ExLeNetAE28(nn.Module):
             nn.Conv2d(20, 50, 5, stride=1),  # (b, 50, 8, 8)
             nn.ReLU(),
             nn.MaxPool2d(2, stride=2)  # (b, 16, 4, 4)
+        )
+
+        # Extra layer to modify extracted feature
+        self.extra_flag = exl_flag
+        self.extra_layer = nn.Sequential(
+            nn.Linear(800, 500),
+            nn.ReLU()
         )
 
         # Decoder Network
@@ -95,6 +102,9 @@ class ExLeNetAE28(nn.Module):
         # Modified the shape of each return tensor
         code = code.flatten(start_dim=1)
         rec = rec.view(-1, 28 * 28)
+
+        if self.extra_flag:
+            code = self.extra_layer(code)
 
         return code, rec
 
@@ -180,3 +190,4 @@ class DynamicGNoise(nn.Module):
 
         self.noise.data.normal_(0, std=self.std)
         return x + self.noise.expand_as(x)
+

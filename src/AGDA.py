@@ -14,8 +14,7 @@ from copy import deepcopy
 
 from LinearAE import LinearAE
 from ConvAE import LeNetAE28, ExLeNetAE28
-from FCNN import LinearClf100, Discriminator100, LinearClf400, Discriminator400
-from FCNN import LinearClf800, Discriminator800
+from FCNN import GDiscriminator, GClassifier
 from usps import USPS
 from GSVHN import GSVHN
 
@@ -34,35 +33,37 @@ def getModelByDimension(t_dim):
     ae, clf, dis = None, None, None
 
     if t_dim == 100:
-        # TODO -- dim 100 doesn't work for now
-        clf = LinearClf100()
-        dis = Discriminator100()
+        clf = GClassifier(params.DEFAULT_CLF_100)
+        dis = GDiscriminator(params.DEFAULT_DIS_100)
         ae = LeNetAE28()
     elif t_dim == 400:
-        clf = LinearClf400()
-        dis = Discriminator400()
+        clf = GClassifier(params.DEFAULT_CLF_400)
+        dis = GDiscriminator(params.DEFAULT_DIS_400)
         ae = LeNetAE28()
     elif t_dim == 800:
-        clf = LinearClf800()
-        dis = Discriminator800()
+        clf = GClassifier(params.DEFAULT_CLF_800)
+        dis = GDiscriminator(params.DEFAULT_DIS_800)
         ae = ExLeNetAE28()
+    elif t_dim == 500:
+        clf = GClassifier(params.DEFAULT_CLF_500)
+        dis = GDiscriminator(params.DEFAULT_DIS_500)
+        ae = ExLeNetAE28(True)
 
     return ae, clf, dis
 
 
 # Auxiliary function that return the number of correct prediction
-def getHitCount(tlabel, plabel):
-    _, plabel = plabel.max(1)
-    num_correct = (tlabel == plabel).sum().item()
+def getHitCount(t_label, p_label):
+    _, p_label = p_label.max(1)
+    num_correct = (t_label == p_label).sum().item()
     return num_correct
 
 
 # Auxiliary function that returns the AE Loss and Classifier Loss
 # in_dl -- input dataset / ae_criterion -- BCELoss or BCEWithLogitsLoss
 def getModelPerformance(in_dl, in_ae, in_clf, ae_criterion):
-    ae_loss = 0.0
-    clf_acc = 0.0
-    instance_count = in_dl.dataset.__len__()
+    ae_loss, clf_acc, instance_count = .0, .0, in_dl.dataset.__len__()
+
     for features, label in in_dl:
 
         features = Variable(features.view(features.shape[0], -1))
@@ -140,7 +141,7 @@ im_tfs = tfs.Compose([
 ])
 
 o_tfs = tfs.Compose([
-    tfs.CenterCrop(28),
+    tfs.Resize(28),
     tfs.ToTensor()
 ])
 
@@ -243,21 +244,22 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
     for step in range(params.tag_train_iter):
         data_zip = enumerate(zip(source_train_data_fusion, target_train_data_fusion))
         for _, ((src_f, _), (tgt_f, _)) in data_zip:
+
+            src_f = Variable(src_f.view(src_f.shape[0], -1))
+            src_valid = Variable(torch.ones(src_f.size(0), 1, dtype=torch.float32))
+            tgt_f = Variable(tgt_f.view(tgt_f.shape[0], -1))
+            tgt_valid = Variable(torch.ones(tgt_f.size(0), 1, dtype=torch.float32))
+            tgt_fake = Variable(torch.zeros(tgt_f.size(0), 1, dtype=torch.float32))
+
             if cuda_flag:
-                src_f = Variable(src_f.view(src_f.shape[0], -1).cuda())
-                src_valid = Variable(torch.ones(src_f.size(0), 1, dtype=torch.float32)).cuda()
-                tgt_f = Variable(tgt_f.view(tgt_f.shape[0], -1).cuda())
-                tgt_valid = Variable(torch.ones(tgt_f.size(0), 1, dtype=torch.float32)).cuda()
-                tgt_fake = Variable(torch.zeros(tgt_f.size(0), 1, dtype=torch.float32)).cuda()
-            else:
-                src_f = Variable(src_f.view(src_f.shape[0], -1))
-                src_valid = Variable(torch.ones(src_f.size(0), 1, dtype=torch.float32))
-                tgt_f = Variable(tgt_f.view(tgt_f.shape[0], -1))
-                tgt_valid = Variable(torch.ones(tgt_f.size(0), 1, dtype=torch.float32))
-                tgt_fake = Variable(torch.zeros(tgt_f.size(0), 1, dtype=torch.float32))
+                src_f = src_f.cuda()
+                src_valid = src_valid.cuda()
+                tgt_f = tgt_f.cuda()
+                tgt_valid = tgt_valid.cuda()
+                tgt_fake = tgt_fake.cuda()
 
             src_code, src_rec = forwardByModelType(source_ae, src_f)
-            tgt_code, tgt_rec = forwardByModelType(source_ae, tgt_f)
+            tgt_code, tgt_rec = forwardByModelType(target_ae, tgt_f)
 
             for d_step in range(params.d_steps):
                 optimizer_D.zero_grad()
@@ -277,7 +279,8 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
                 optimizer_D.step()
 
             for g_step in range(params.g_steps):
-                tgt_code, tgt_rec = forwardByModelType(source_ae, tgt_f)
+                optimizer_G.zero_grad()
+                tgt_code, tgt_rec = forwardByModelType(target_ae, tgt_f)
                 tgt_domain_label = target_dis(tgt_code)
 
                 loss_tgt_rec = criterion_ae(tgt_f, tgt_rec)

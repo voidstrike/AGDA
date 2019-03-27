@@ -2,89 +2,22 @@ from torch import nn
 from torch.nn import init
 
 
-#  Classifier -- dimension of hidden space equals 100
-class LinearClf100(nn.Module):
-    def __init__(self):
-        super(LinearClf100, self).__init__()
+# General version of classifier -- Configure the network structure in params.py
+class GClassifier(nn.Module):
+    def __init__(self, layer_list, relu_flag=True):
+        super(GClassifier, self).__init__()
 
-        # Create Sequential Model
-        self.model = nn.Sequential(
-            nn.Linear(100, 64),
-            nn.LeakyReLU(),
-            nn.Linear(64, 32),
-            nn.LeakyReLU(),
-            nn.Linear(32, 16),
-            nn.LeakyReLU(),
-            nn.Linear(16, 10)
-        )
+        tmp_module_list = []
 
-        # Initialize the weight via Xavier
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                init.xavier_uniform_(module.weight)
+        for c_index in range(1, len(layer_list)):
+            tmp_module_list.append(nn.Linear(layer_list[c_index-1], layer_list[c_index]))
+            if relu_flag:
+                tmp_module_list.append(nn.ReLU())
+            else:
+                tmp_module_list.append(nn.LeakyReLU())
+        tmp_module_list.append(nn.Linear(layer_list[-1], 10))
 
-    def forward(self, x):
-        return self.model(x)
-
-
-#  Classifier -- dimension of hidden space equals 100
-class LinearClf400(nn.Module):
-    def __init__(self):
-        super(LinearClf400, self).__init__()
-
-        # Create Sequential Model
-        self.model = nn.Sequential(
-            nn.Linear(400, 120),
-            nn.LeakyReLU(),
-            nn.Linear(120, 84),
-            nn.LeakyReLU(),
-            nn.Linear(84, 10)
-        )
-
-        # Initialize the weight via Xavier
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                init.xavier_uniform_(module.weight)
-
-    def forward(self, x):
-        return self.model(x)
-
-
-#  Classifier -- dimension of hidden space equals 100
-class LinearClf800(nn.Module):
-    def __init__(self):
-        super(LinearClf800, self).__init__()
-
-        # Create Sequential Model
-        self.model = nn.Sequential(
-            nn.Linear(800, 500),
-            nn.LeakyReLU(),
-            nn.Linear(500, 500),
-            nn.LeakyReLU(),
-            nn.Linear(500, 10)
-        )
-
-        # Initialize the weight via Xavier
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                init.xavier_uniform_(module.weight)
-
-    def forward(self, x):
-        return self.model(x)
-
-
-#  GAN - Discriminator - dimension of hidden space equals 100
-class Discriminator100(nn.Module):
-    def __init__(self):
-        super(Discriminator100, self).__init__()
-
-        self.model = nn.Sequential(
-            nn.Linear(100, 50),
-            nn.LeakyReLU(),
-            nn.Linear(50, 16),
-            nn.LeakyReLU(),
-            nn.Linear(16, 1),
-        )
+        self.model = nn.Sequential(*tmp_module_list)
 
         # Initialize the weight via Xavier
         for module in self.modules():
@@ -96,39 +29,22 @@ class Discriminator100(nn.Module):
         return validity
 
 
-#  GAN - Discriminator - dimension of hidden space equals 400
-class Discriminator400(nn.Module):
-    def __init__(self):
-        super(Discriminator400, self).__init__()
+# General version of discriminator -- Configure the network structure in params.py
+class GDiscriminator(nn.Module):
+    def __init__(self, layer_list, relu_flag=True):
+        super(GDiscriminator, self).__init__()
 
-        self.model = nn.Sequential(
-            nn.Linear(400, 200),
-            nn.LeakyReLU(),
-            nn.Linear(200, 200),
-            nn.LeakyReLU(),
-            nn.Linear(200, 1)
-        )
+        tmp_module_list = []
 
-        # Initialize the weight via Xavier
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                init.xavier_uniform_(module.weight)
+        for c_index in range(1, len(layer_list)):
+            tmp_module_list.append(nn.Linear(layer_list[c_index-1], layer_list[c_index]))
+            if relu_flag:
+                tmp_module_list.append(nn.ReLU())
+            else:
+                tmp_module_list.append(nn.LeakyReLU())
+        tmp_module_list.append(nn.Linear(layer_list[-1], 1))
 
-    def forward(self, img):
-        validity = self.model(img)
-        return validity
-
-
-#  GAN - Discriminator - dimension of hidden space equals 800
-class Discriminator800(nn.Module):
-    def __init__(self):
-        super(Discriminator800, self).__init__()
-
-        self.model = nn.Sequential(
-            nn.Linear(800, 200),
-            nn.ReLU(),
-            nn.Linear(200, 1)
-        )
+        self.model = nn.Sequential(*tmp_module_list)
 
         # Initialize the weight via Xavier
         for module in self.modules():
