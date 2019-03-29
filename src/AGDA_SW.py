@@ -10,12 +10,10 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader, RandomSampler
 from torchvision import transforms as tfs
 from torch import nn
-from copy import deepcopy
 
 from LinearAE import LinearAE
 from ConvAE import LeNetAE28, ExLeNetAE28
-from FCNN import LinearClf100, Discriminator100, LinearClf400, Discriminator400
-from FCNN import LinearClf800, Discriminator800
+from FCNN import GClassifier, GDiscriminator
 from usps import USPS
 from GSVHN import GSVHN
 
@@ -34,35 +32,37 @@ def getModelByDimension(t_dim):
     ae, clf, dis = None, None, None
 
     if t_dim == 100:
-        # TODO -- dim 100 doesn't work for now
-        clf = LinearClf100()
-        dis = Discriminator100()
+        clf = GClassifier(params.DEFAULT_CLF_100)
+        dis = GDiscriminator(params.DEFAULT_DIS_100)
         ae = LeNetAE28()
     elif t_dim == 400:
-        clf = LinearClf400()
-        dis = Discriminator400()
+        clf = GClassifier(params.DEFAULT_CLF_400)
+        dis = GDiscriminator(params.DEFAULT_DIS_400)
         ae = LeNetAE28()
     elif t_dim == 800:
-        clf = LinearClf800()
-        dis = Discriminator800()
+        clf = GClassifier(params.DEFAULT_CLF_800)
+        dis = GDiscriminator(params.DEFAULT_DIS_800)
         ae = ExLeNetAE28()
+    elif t_dim == 500:
+        clf = GClassifier(params.DEFAULT_CLF_500)
+        dis = GDiscriminator(params.DEFAULT_DIS_500)
+        ae = ExLeNetAE28(True)
 
     return ae, clf, dis
 
 
 # Auxiliary function that return the number of correct prediction
-def getHitCount(tlabel, plabel):
-    _, plabel = plabel.max(1)
-    num_correct = (tlabel == plabel).sum().item()
+def getHitCount(t_label, p_label):
+    _, p_label = p_label.max(1)
+    num_correct = (t_label == p_label).sum().item()
     return num_correct
 
 
 # Auxiliary function that returns the AE Loss and Classifier Loss
 # in_dl -- input dataset / ae_criterion -- BCELoss or BCEWithLogitsLoss
 def getModelPerformance(in_dl, in_ae, in_clf, ae_criterion):
-    ae_loss = 0.0
-    clf_acc = 0.0
-    instance_count = in_dl.dataset.__len__()
+    ae_loss, clf_acc, instance_count = .0, .0, in_dl.dataset.__len__()
+
     for features, label in in_dl:
 
         features = Variable(features.view(features.shape[0], -1))
@@ -99,7 +99,7 @@ def getDataLoader(ds_name, root_path, train=True):
     else:
         raise Exception("Unsupported Dataset")
 
-    r_sampler = RandomSampler(data_set, replacement=True, num_samples=params.fusion_size)
+    r_sampler = RandomSampler(data_set, replacement=False)
     target_dl = DataLoader(data_set, batch_size=params.batch_size, shuffle=True)
     if train:
         target_dl_fusion = DataLoader(data_set, sampler=r_sampler, batch_size=params.fusion_size)
@@ -140,7 +140,7 @@ im_tfs = tfs.Compose([
 ])
 
 o_tfs = tfs.Compose([
-    tfs.CenterCrop(28),
+    tfs.Resize(28),
     tfs.ToTensor()
 ])
 
@@ -186,20 +186,21 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
         for step in range(params.clf_train_iter):
             data_zip = enumerate(zip(source_train_data, target_train_data))
             for _, ((src_f, src_l), (tgt_f, _)) in data_zip:
+
+                src_f = Variable(src_f.view(src_f.shape[0], -1))
+                src_valid = Variable(torch.ones(src_f.size(0), 1, dtype=torch.float32))
+                tgt_f = Variable(tgt_f.view(tgt_f.shape[0], -1))
+                tgt_valid = Variable(torch.ones(tgt_f.size(0), 1, dtype=torch.float32))
+                tgt_fake = Variable(torch.zeros(tgt_f.size(0), 1, dtype=torch.float32))
+                src_l = Variable(src_l)
+
                 if cuda_flag:
-                    src_f = Variable(src_f.view(src_f.shape[0], -1).cuda())
-                    src_valid = Variable(torch.ones(src_f.size(0), 1, dtype=torch.float32)).cuda()
-                    tgt_f = Variable(tgt_f.view(tgt_f.shape[0], -1).cuda())
-                    tgt_valid = Variable(torch.ones(tgt_f.size(0), 1, dtype=torch.float32)).cuda()
-                    tgt_fake = Variable(torch.zeros(tgt_f.size(0), 1, dtype=torch.float32)).cuda()
-                    src_l = Variable(src_l.cuda())
-                else:
-                    src_f = Variable(src_f.view(src_f.shape[0], -1))
-                    src_valid = Variable(torch.ones(src_f.size(0), 1, dtype=torch.float32))
-                    tgt_f = Variable(tgt_f.view(tgt_f.shape[0], -1))
-                    tgt_valid = Variable(torch.ones(tgt_f.size(0), 1, dtype=torch.float32))
-                    tgt_fake = Variable(torch.zeros(tgt_f.size(0), 1, dtype=torch.float32))
-                    src_l = Variable(src_l)
+                    src_f = src_f.cuda()
+                    src_valid = src_valid.cuda()
+                    tgt_f = tgt_f.cuda()
+                    tgt_valid = tgt_valid.cuda()
+                    tgt_fake = tgt_fake.cuda()
+                    src_l = src_l.cuda()
 
                 src_code, src_rec = forwardByModelType(source_ae, src_f)
                 tgt_code, tgt_rec = forwardByModelType(source_ae, tgt_f)
@@ -232,7 +233,10 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
                     loss_src_clf = criterion_clf(label_predict, src_l)
                     loss_tgt_gen = criterion_gan(tgt_domain_label, tgt_valid)
 
-                    loss_total = loss_src_rec + loss_tgt_rec + loss_src_clf + loss_tgt_gen
+                    loss_total = params.source_ae_weight * loss_src_rec + \
+                                 params.target_ae_weight * loss_tgt_rec + \
+                                 params.source_clf_weight * loss_src_clf + \
+                                 params.target_fusion_weight * loss_tgt_gen
 
                     loss_total.backward()
                     optimizer_G.step()

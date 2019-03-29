@@ -267,9 +267,10 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
                 src_domain_label = target_dis(src_code)
                 tgt_domain_label = target_dis(tgt_code)
 
-                loss_src_dis = criterion_gan(src_domain_label, src_valid)
-                loss_tgt_dis = criterion_gan(tgt_domain_label, tgt_fake)
-                d_loss = (loss_src_dis + loss_tgt_dis) / 2
+                over_all_domain_label = torch.cat((src_domain_label, tgt_domain_label), 0)
+                over_all_domain_valid = torch.cat((src_valid, tgt_fake), 0)
+
+                d_loss = criterion_gan(over_all_domain_label, over_all_domain_valid)
 
                 if d_step != params.d_steps - 1:
                     d_loss.backward(retain_graph=True)

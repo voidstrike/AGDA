@@ -67,10 +67,12 @@ class ExLeNetAE28(nn.Module):
         self.encoder_cnn = nn.Sequential(
             # DynamicGNoise(28, std=0.05),
             nn.Conv2d(1, 20, 5, stride=1),  # (b, 20, 24, 24)
+            nn.BatchNorm2d(20),
             nn.ReLU(),
             nn.MaxPool2d(2, stride=2),  # (b, 20, 12, 12)
             # DynamicGNoise(12, std=0.05),
             nn.Conv2d(20, 50, 5, stride=1),  # (b, 50, 8, 8)
+            nn.BatchNorm2d(50),
             nn.ReLU(),
             nn.MaxPool2d(2, stride=2)  # (b, 16, 4, 4)
         )
