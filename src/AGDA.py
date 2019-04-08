@@ -4,16 +4,17 @@ import params
 import sys
 import torch
 import datetime
+import PTransformer as ptf
 
-from torchvision.datasets import MNIST
+from torchvision.datasets import MNIST, SVHN
 from torch.autograd import Variable
 from torch.utils.data import DataLoader, RandomSampler
-from torchvision import transforms as tfs
+from torchvision import datasets
 from torch import nn
 from copy import deepcopy
 
 from LinearAE import LinearAE
-from ConvAE import LeNetAE28, ExLeNetAE28
+from ConvAE import LeNetAE28, LeNetAE32, ExLeNetAE28
 from FCNN import GDiscriminator, GClassifier
 from usps import USPS
 from GSVHN import GSVHN
@@ -29,25 +30,34 @@ def forwardByModelType(in_model, in_vec, psize=28, pchannel=1):
 
 
 # Auxiliary function that return corresponding model
-def getModelByDimension(t_dim):
+def getModelByDimension(t_dim, office_flag=False):
     ae, clf, dis = None, None, None
 
-    if t_dim == 100:
-        clf = GClassifier(params.DEFAULT_CLF_100)
-        dis = GDiscriminator(params.DEFAULT_DIS_100)
-        ae = LeNetAE28()
-    elif t_dim == 400:
-        clf = GClassifier(params.DEFAULT_CLF_400)
-        dis = GDiscriminator(params.DEFAULT_DIS_400)
-        ae = LeNetAE28()
-    elif t_dim == 800:
-        clf = GClassifier(params.DEFAULT_CLF_800)
-        dis = GDiscriminator(params.DEFAULT_DIS_800)
-        ae = ExLeNetAE28()
-    elif t_dim == 500:
-        clf = GClassifier(params.DEFAULT_CLF_500)
-        dis = GDiscriminator(params.DEFAULT_DIS_500)
-        ae = ExLeNetAE28(True)
+    if not office_flag:
+        if t_dim == 100:
+            clf = GClassifier(params.DEFAULT_CLF_100)
+            dis = GDiscriminator(params.DEFAULT_DIS_100)
+            ae = LeNetAE28()
+        elif t_dim == 400:
+            clf = GClassifier(params.DEFAULT_CLF_400)
+            dis = GDiscriminator(params.DEFAULT_DIS_400)
+            ae = LeNetAE28()
+        elif t_dim == 800:
+            clf = GClassifier(params.DEFAULT_CLF_800)
+            dis = GDiscriminator(params.DEFAULT_DIS_800)
+            ae = ExLeNetAE28()
+        elif t_dim == 500:
+            clf = GClassifier(params.DEFAULT_CLF_500)
+            dis = GDiscriminator(params.DEFAULT_DIS_500)
+            ae = ExLeNetAE28(True)
+        elif t_dim == -1:
+            clf = GClassifier(params.DEFAULT_CLF_400)
+            dis = GDiscriminator(params.DEFAULT_DIS_400)
+            ae = LeNetAE32()
+    else:
+        # Deal with OFFICE-31 data set, using AlexNet, VGG-16, ResNet?
+        # TODO
+        pass
 
     return ae, clf, dis
 
@@ -92,11 +102,28 @@ def getDataLoader(ds_name, root_path, train=True):
 
     # Get data set by their name
     if ds_name == "mnist":
-        data_set = MNIST(root_path + '/../data/mnist',  train=train, transform=im_tfs, download=True)
+        if params.input_img_size == 28:
+            data_set = MNIST(root_path + '/../data/mnist',  train=train, transform=ptf.directly_tfs, download=True)
+        else:
+            data_set = MNIST(root_path + '/../data/mnist',  train=train, transform=ptf.tfs_32, download=True)
     elif ds_name == "usps":
-        data_set = USPS(root_path + '/../data', train=train, transform=im_tfs, download=True)
+        data_set = USPS(root_path + '/../data', train=train, transform=ptf.directly_tfs, download=True)
     elif ds_name == "svhn":
-        data_set = GSVHN(root_path + '/../data/svhn', split='train' if train else 'test', transform=o_tfs, download=True)
+        if params.input_img_size == 28:
+            # data_set = GSVHN(root_path + '/../data/svhn', split='train' if train else 'test',
+            #                  transform=ptf.tfs_28, download=True)
+            data_set = SVHN(root_path + '/../data/svhn', split='train' if train else 'test',
+                             transform=ptf.tfs_28_gray, download=True)
+        else:
+            # data_set = GSVHN(root_path + '/../data/svhn', split='train' if train else 'test',
+            #                  transform=ptf.tfs_32, download=True)
+            data_set = SVHN(root_path + '/../data/svhn', split='train' if train else 'test',
+                             transform=ptf.tfs_32_gray, download=True)
+
+    elif ds_name == "amazon" or ds_name == "webcam" or ds_name == "dslr":
+        tmp_path = root_path + '/../data/office/'
+        tmp_path += 'train/' if train else 'test/'
+        data_set = datasets.ImageFolder(tmp_path + ds_name + "/", transform=ptf.tfs_224)
     else:
         raise Exception("Unsupported Dataset")
 
@@ -125,25 +152,6 @@ def getDisMean(data_loader, tfs_model, h_dim):
         ex_feature, _ = tfs_model(feature)
         res += ex_feature.sum(dim=-2)
     return res / instance_count
-
-
-# Auxiliary function that convert tensor back to img
-def to_img(x):
-    x = 0.5 * (x + 1.)
-    x = x.clamp(0, 1)
-    x = x.view(x.shape[0], 1, 28, 28)
-    return x
-
-
-# Auxiliary torch.transforms object that convert img to tensor
-im_tfs = tfs.Compose([
-    tfs.ToTensor()
-])
-
-o_tfs = tfs.Compose([
-    tfs.Resize(28),
-    tfs.ToTensor()
-])
 
 
 def main(load_model=False, hidden_dim=100, cuda_flag=False):

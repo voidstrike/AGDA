@@ -1,6 +1,7 @@
 from torch import nn
 from torch.nn import init
 from torch.autograd import Variable
+from copy import deepcopy
 import torch
 
 
@@ -132,18 +133,16 @@ class LeNetAE32(nn.Module):
             # DynamicGNoise(32, std=0.05),
             nn.Conv2d(1, 6, 5, stride=1, padding=0),  # (b, 6, 28, 28)
             nn.ReLU(True),
-            nn.AvgPool2d(2, stride=2),  # (b, 6, 14, 14)
+            nn.MaxPool2d(2, stride=2),  # (b, 6, 14, 14)
             # DynamicGNoise(14, std=0.05),
             nn.Conv2d(6, 16, 5, stride=1, padding=0),  # (b, 16, 10, 10)
             nn.ReLU(True),
-            nn.AvgPool2d(2, stride=2)  # (b, 16, 5, 5)
+            nn.MaxPool2d(2, stride=2)  # (b, 16, 5, 5)
         )
 
         # Decoder Network
         self.decoder_cnn = nn.Sequential(
-            nn.ConvTranspose2d(16, 16, 2, stride=2),  # (b, 16, 10, 10)
-            nn.ReLU(True),
-            nn.ConvTranspose2d(16, 6, 5, stride=1, padding=0),  # (b, 6, 14, 14)
+            nn.ConvTranspose2d(16, 6, 3, stride=3, padding=0),  # (b, 6, 15, 15)
             nn.ReLU(True),
             nn.ConvTranspose2d(6, 1, 4, stride=2, padding=0),  # (b, 1, 32, 32)
             nn.Tanh()
@@ -174,6 +173,49 @@ class LeNetAE32(nn.Module):
                         ct += 1
                     else:
                         init.xavier_uniform_(eachLayer.weight)
+
+
+# TODO
+class ExAlexNet(nn.Module):
+    def __init__(self, feature_extractor=None):
+        super(ExAlexNet, self).__init__()
+
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.pool1 = nn.MaxPool2d(kernel_size=3, stride=2)
+        self.conv2 = nn.Conv2d(64, 192, kernel_size=5, padding=2)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.pool2 = nn.MaxPool2d(kernel_size=3, stride=2)
+        self.conv3 = nn.Conv2d(192, 384, kernel_size=3, padding=1)
+        self.relu3 = nn.ReLU(inplace=True)
+        self.conv4 = nn.Conv2d(384, 256, kernel_size=3, padding=1)
+        self.relu4 = nn.ReLU(inplace=True)
+        self.conv5 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.relu5 = nn.ReLU(inplace=True)
+        self.pool3 = nn.MaxPool2d(kernel_size=3, stride=2)
+        self.avgpool = nn.AdaptiveAvgPool2d(6)
+
+        if feature_extractor is not None:
+            tmp_count = 1
+            for module in feature_extractor:
+                if isinstance(nn.Conv2d, module):
+                    if tmp_count == 1:
+                        self.conv1 = deepcopy(module)
+                    elif tmp_count == 2:
+                        self.conv2 = deepcopy(module)
+                    elif tmp_count == 3:
+                        self.conv3 = deepcopy(module)
+                    elif tmp_count == 4:
+                        self.conv4 = deepcopy(module)
+                    elif tmp_count == 5:
+                        self.conv5 = deepcopy(module)
+                    tmp_count += 1
+
+        self.decoder = nn.Sequential(
+
+        )
+
+
 
 
 class DynamicGNoise(nn.Module):

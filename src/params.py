@@ -7,7 +7,7 @@ data_root = "data"
 batch_size = 128
 fusion_size = 256
 image_size = 64
-dim_set = [100, 400, 500, 800]
+dim_set = [-1, 100, 400, 500, 800]
 
 # params for target dataset
 tgt_dataset = "USPS"
@@ -17,6 +17,7 @@ tgt_model_trained = True
 # params for data set selection
 source_data_set = "mnist"
 target_data_set = "svhn"
+input_img_size = 28
 
 # params for model training
 clf_train_iter = 1          # Number of iterations to train the source domain AE + CLF
@@ -40,13 +41,13 @@ target_fusion_weight = 1.   # The weight of domain fusion loss during target tra
 # Default Discriminator Network Setting
 DEFAULT_DIS_800 = [800, 200]
 DEFAULT_DIS_500 = [500, 200]
-DEFAULT_DIS_400 = [400, 200, 200]
+DEFAULT_DIS_400 = [400, 400, 200]
 DEFAULT_DIS_100 = [100, 50, 16]
 
 # Default Classifier Network Setting
 DEFAULT_CLF_800 = [800, 500, 500]
 DEFAULT_CLF_500 = [500, 500]
-DEFAULT_CLF_400 = [400, 120, 84]
+DEFAULT_CLF_400 = [400, 200, 100]
 DEFAULT_CLF_100 = [100, 64, 32, 16]
 
 
