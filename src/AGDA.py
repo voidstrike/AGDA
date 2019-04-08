@@ -21,7 +21,7 @@ from GSVHN import GSVHN
 
 
 # Auxiliary function that forward input through in_model once
-def forwardByModelType(in_model, in_vec, psize=28, pchannel=1):
+def forwardByModelType(in_model, in_vec, psize=params.input_img_size, pchannel=1):
     if not isinstance(in_model, LinearAE):
         code, rec = in_model(in_vec.view(-1, pchannel, psize, psize))
     else:
@@ -143,6 +143,8 @@ def getMMD(sdl, sm, tdl, tm, hd):
 
 
 def getDisMean(data_loader, tfs_model, h_dim):
+    if h_dim == -1:
+        h_dim = 400
     res = torch.zeros(1, h_dim)
     res = res.cuda() if torch.cuda.is_available() else res
     instance_count = 0.
