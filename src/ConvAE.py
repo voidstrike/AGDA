@@ -198,24 +198,67 @@ class ExAlexNet(nn.Module):
         if feature_extractor is not None:
             tmp_count = 1
             for module in feature_extractor:
-                if isinstance(nn.Conv2d, module):
+                if isinstance(module, nn.Conv2d):
                     if tmp_count == 1:
                         self.conv1 = deepcopy(module)
+                        self.conv1.requires_grad = False
                     elif tmp_count == 2:
                         self.conv2 = deepcopy(module)
+                        self.conv2.requires_grad = False
                     elif tmp_count == 3:
                         self.conv3 = deepcopy(module)
+                        self.conv3.requires_grad = False
                     elif tmp_count == 4:
                         self.conv4 = deepcopy(module)
+                        self.conv4.requires_grad = False
                     elif tmp_count == 5:
                         self.conv5 = deepcopy(module)
                     tmp_count += 1
 
         self.decoder = nn.Sequential(
-
+            nn.ConvTranspose2d(256, 256, kernel_size=4, stride=1),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(256, 384, kernel_size=5, stride=1),
+            nn.Tanh()
         )
 
 
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.relu1(x)
+        x = self.pool1(x)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.pool2(x)
+        x = self.conv3(x)
+        x = self.relu3(x)
+        intermediate_img = x
+
+        x = self.conv4(x)
+        x = self.relu4(x)
+        x = self.conv5(x)
+        x = self.relu5(x)
+        x = self.pool3(x)
+        final_feature = self.avgpool(x)
+        rec_img = self.decoder(final_feature)
+        print(rec_img.shape)
+
+        final_feature = final_feature.flatten(start_dim=1)
+        intermediate_img = intermediate_img.view(-1, 384 * 13 * 13)
+        rec_img = rec_img.view(-1, 384 * 13 * 13)
+
+        return intermediate_img, final_feature, rec_img
+
+    def setPartialTrainable(self, num_layer=0):
+        if num_layer != 0:
+            ct = 0
+            for eachLayer in self.encoder_cnn:
+                if isinstance(eachLayer, torch.nn.Conv2d):
+                    if ct < num_layer:
+                        eachLayer.requires_grad = False
+                        ct += 1
+                    else:
+                        init.xavier_uniform_(eachLayer.weight)
 
 
 class DynamicGNoise(nn.Module):

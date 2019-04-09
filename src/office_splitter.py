@@ -61,5 +61,5 @@ test_path = root_path + "/test/"
 
 amazon_path = "/amazon/images/"
 
-build_train_test_split(root_path, "amazon", train_path, test_path)
+build_train_test_split(root_path, "webcam", train_path, test_path)
 

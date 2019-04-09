@@ -36,3 +36,8 @@ tfs_224 = tfs.Compose([
     tfs.Resize((224, 224)),
     tfs.ToTensor()
 ])
+
+tfs_227 = tfs.Compose([
+    tfs.Resize((227, 227)),
+    tfs.ToTensor()
+])

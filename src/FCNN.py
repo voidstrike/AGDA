@@ -4,7 +4,7 @@ from torch.nn import init
 
 # General version of classifier -- Configure the network structure in params.py
 class GClassifier(nn.Module):
-    def __init__(self, layer_list, relu_flag=True):
+    def __init__(self, layer_list, relu_flag=True, output_size=10):
         super(GClassifier, self).__init__()
 
         tmp_module_list = []
@@ -15,7 +15,7 @@ class GClassifier(nn.Module):
                 tmp_module_list.append(nn.ReLU())
             else:
                 tmp_module_list.append(nn.LeakyReLU())
-        tmp_module_list.append(nn.Linear(layer_list[-1], 10))
+        tmp_module_list.append(nn.Linear(layer_list[-1], output_size))
 
         self.model = nn.Sequential(*tmp_module_list)
 

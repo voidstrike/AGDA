@@ -21,12 +21,10 @@ from torchvision.models import alexnet
 
 
 # Auxiliary function that forward input through in_model once
-def forwardByModelType(in_model, in_vec, psize=params.input_img_size, pchannel=1):
-    if not isinstance(in_model, LinearAE):
-        code, rec = in_model(in_vec.view(-1, pchannel, psize, psize))
-    else:
-        code, rec = in_model(in_vec)
-    return code, rec
+def forwardByModelType(in_model, in_vec, psize=227, pchannel=3):
+
+    int_img, code, rec = in_model(in_vec.view(-1, pchannel, psize, psize))
+    return int_img, code, rec
 
 
 # Auxiliary function that return corresponding model
@@ -89,9 +87,9 @@ def getModelPerformance(in_dl, in_ae, in_clf, ae_criterion):
             features = features.cuda()
             label = label.cuda()
 
-        target_code, target_rec = forwardByModelType(in_ae, features)
+        int_img, target_code, target_rec = forwardByModelType(in_ae, features)
 
-        ae_loss_batch = ae_criterion(features, target_rec)
+        ae_loss_batch = ae_criterion(int_img, target_rec)
         ae_loss += ae_loss_batch.item()
 
         label_pred = in_clf(target_code)
@@ -117,19 +115,16 @@ def getDataLoader(ds_name, root_path, train=True):
     elif ds_name == "svhn":
         if params.input_img_size == 28:
             # data_set = GSVHN(root_path + '/../data/svhn', split='train' if train else 'test',
-            #                  transform=ptf.tfs_28, download=True)
             data_set = SVHN(root_path + '/../data/svhn', split='train' if train else 'test',
                              transform=ptf.tfs_28_gray, download=True)
         else:
-            # data_set = GSVHN(root_path + '/../data/svhn', split='train' if train else 'test',
-            #                  transform=ptf.tfs_32, download=True)
             data_set = SVHN(root_path + '/../data/svhn', split='train' if train else 'test',
                              transform=ptf.tfs_32_gray, download=True)
 
     elif ds_name == "amazon" or ds_name == "webcam" or ds_name == "dslr":
         tmp_path = root_path + '/../data/office/'
         tmp_path += 'train/' if train else 'test/'
-        data_set = datasets.ImageFolder(tmp_path + ds_name + "/", transform=ptf.tfs_224)
+        data_set = datasets.ImageFolder(tmp_path + ds_name + "/", transform=ptf.tfs_227)
     else:
         raise Exception("Unsupported Dataset")
 
@@ -149,15 +144,15 @@ def getMMD(sdl, sm, tdl, tm, hd):
 
 
 def getDisMean(data_loader, tfs_model, h_dim):
-    if h_dim == -1:
-        h_dim = 400
+    if h_dim == -2:
+        h_dim = 256 * 6 * 6
     res = torch.zeros(1, h_dim)
     res = res.cuda() if torch.cuda.is_available() else res
     instance_count = 0.
     for feature, _ in data_loader:
         feature = feature.cuda() if torch.cuda.is_available() else feature
         instance_count += feature.shape[0]
-        ex_feature, _ = tfs_model(feature)
+        _, ex_feature, _ = tfs_model(feature)
         res += ex_feature.sum(dim=-2)
     return res / instance_count
 
@@ -177,7 +172,7 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
 
     # Initialize source classifier and target discriminator
     # source_ae = LeNetAE28()
-    source_ae, source_clf, target_dis = getModelByDimension(hidden_dim)
+    source_ae, source_clf, target_dis = getModelByDimension(hidden_dim, True)
 
     if load_model:
         source_ae.load_state_dict(torch.load(root_path + '/../modeinfo/source_ae_' + params.source_data_set + '.pt'))
@@ -212,10 +207,10 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
                     features = Variable(features.view(features.shape[0], -1))
                     label = Variable(label)
 
-                source_code, source_rec = forwardByModelType(source_ae, features)
+                intermediate_img, source_code, source_rec = forwardByModelType(source_ae, features)
                 label_predict = source_clf(source_code)
 
-                loss_ae = criterion_ae(features, source_rec)
+                loss_ae = criterion_ae(intermediate_img, source_rec)
                 loss_clf = criterion_clf(label_predict, label)
                 floss = params.source_ae_weight * loss_ae + params.source_clf_weight * loss_clf
 
@@ -274,8 +269,8 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
                 tgt_valid = tgt_valid.cuda()
                 tgt_fake = tgt_fake.cuda()
 
-            src_code, src_rec = forwardByModelType(source_ae, src_f)
-            tgt_code, tgt_rec = forwardByModelType(target_ae, tgt_f)
+            src_int, src_code, src_rec = forwardByModelType(source_ae, src_f)
+            tgt_int, tgt_code, tgt_rec = forwardByModelType(target_ae, tgt_f)
 
             for d_step in range(params.d_steps):
                 optimizer_D.zero_grad()
@@ -297,10 +292,10 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
 
             for g_step in range(params.g_steps):
                 optimizer_G.zero_grad()
-                tgt_code, tgt_rec = forwardByModelType(target_ae, tgt_f)
+                tgt_int, tgt_code, tgt_rec = forwardByModelType(target_ae, tgt_f)
                 tgt_domain_label = target_dis(tgt_code)
 
-                loss_tgt_rec = criterion_ae(tgt_f, tgt_rec)
+                loss_tgt_rec = criterion_ae(tgt_int, tgt_rec)
                 loss_tgt_gen = criterion_gan(tgt_domain_label, tgt_valid)
 
                 loss_total = params.target_ae_weight * loss_tgt_rec + params.target_fusion_weight * loss_tgt_gen
