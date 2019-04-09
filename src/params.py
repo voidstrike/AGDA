@@ -20,7 +20,7 @@ target_data_set = "dslr"
 input_img_size = 28
 
 # params for model training
-clf_train_iter = 0          # Number of iterations to train the source domain AE + CLF
+clf_train_iter = 1          # Number of iterations to train the source domain AE + CLF
 tag_train_iter = 1          # Number of iterations to perform the distribution fusion steps (One fusion each iteration)
 
 fusion_steps = 10           # Parameter for early fusion version -- SUSPENDED

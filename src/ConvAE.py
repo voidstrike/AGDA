@@ -241,7 +241,6 @@ class ExAlexNet(nn.Module):
         x = self.pool3(x)
         final_feature = self.avgpool(x)
         rec_img = self.decoder(final_feature)
-        print(rec_img.shape)
 
         final_feature = final_feature.flatten(start_dim=1)
         intermediate_img = intermediate_img.view(-1, 384 * 13 * 13)
