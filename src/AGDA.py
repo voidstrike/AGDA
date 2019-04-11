@@ -116,13 +116,9 @@ def getDataLoader(ds_name, root_path, train=True):
         data_set = USPS(root_path + '/../data', train=train, transform=ptf.directly_tfs, download=True)
     elif ds_name == "svhn":
         if params.input_img_size == 28:
-            # data_set = GSVHN(root_path + '/../data/svhn', split='train' if train else 'test',
-            #                  transform=ptf.tfs_28, download=True)
             data_set = SVHN(root_path + '/../data/svhn', split='train' if train else 'test',
                              transform=ptf.tfs_28_gray, download=True)
         else:
-            # data_set = GSVHN(root_path + '/../data/svhn', split='train' if train else 'test',
-            #                  transform=ptf.tfs_32, download=True)
             data_set = SVHN(root_path + '/../data/svhn', split='train' if train else 'test',
                              transform=ptf.tfs_32_gray, download=True)
 
@@ -191,7 +187,8 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
 
     src_optimizer = torch.optim.Adam(list(source_ae.parameters()) + list(source_clf.parameters()),
                                      lr=params.clf_learning_rate,
-                                     weight_decay=2.5e-5)
+                                     weight_decay=2.5e-5,
+                                     betas=(.5, .999))
 
     if cuda_flag:
         source_ae = source_ae.cuda()

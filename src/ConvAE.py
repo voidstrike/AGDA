@@ -75,7 +75,7 @@ class ExLeNetAE28(nn.Module):
             nn.Conv2d(20, 50, 5, stride=1),  # (b, 50, 8, 8)
             nn.BatchNorm2d(50),
             nn.ReLU(),
-            nn.MaxPool2d(2, stride=2)  # (b, 16, 4, 4)
+            nn.MaxPool2d(2, stride=2)  # (b, 50, 4, 4)
         )
 
         # Extra layer to modify extracted feature
@@ -87,9 +87,9 @@ class ExLeNetAE28(nn.Module):
 
         # Decoder Network
         self.decoder_cnn = nn.Sequential(
-            nn.ConvTranspose2d(50, 20, 5, stride=3, padding=1),  # (b, 20, 12, 12)
+            nn.ConvTranspose2d(50, 20, 6, stride=2),  # (b, 20, 12, 12)
             nn.ReLU(True),
-            nn.ConvTranspose2d(20, 1, 6, stride=2, padding=0),  # (b, 1, 28, 28)
+            nn.ConvTranspose2d(20, 1, 6, stride=2),  # (b, 1, 28, 28)
             nn.ReLU(True),
             nn.Tanh()
         )

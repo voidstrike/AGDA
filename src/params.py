@@ -39,7 +39,7 @@ target_ae_weight = 1.       # The weight of ae loss during target training proce
 target_fusion_weight = 1.   # The weight of domain fusion loss during target training process
 
 # Default Discriminator Network Setting
-DEFAULT_DIS_800 = [800, 200]
+DEFAULT_DIS_800 = [800, 500, 500]
 DEFAULT_DIS_500 = [500, 200]
 DEFAULT_DIS_400 = [400, 400, 200]
 DEFAULT_DIS_100 = [100, 50, 16]
@@ -47,7 +47,7 @@ DEFAULT_DIS_100 = [100, 50, 16]
 DEFAULT_IMG_DIS = [256 * 6 * 6, 4096, 2048]
 
 # Default Classifier Network Setting
-DEFAULT_CLF_800 = [800, 500, 500]
+DEFAULT_CLF_800 = [800, 500]
 DEFAULT_CLF_500 = [500, 500]
 DEFAULT_CLF_400 = [400, 200, 100]
 DEFAULT_CLF_100 = [100, 64, 32, 16]
