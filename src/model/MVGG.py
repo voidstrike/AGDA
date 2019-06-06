@@ -41,14 +41,14 @@ class MultiVGG19(nn.Module):
         self.conv5_2 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
         self.conv5_3 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
         self.conv5_4 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
-
-        if pool == 'max':
+        
+        if pool is None or pool != 'avg':
             self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
             self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
             self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
             self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
             self.pool5 = nn.MaxPool2d(kernel_size=2, stride=2)
-        elif pool == 'avg':
+        else:
             self.pool1 = nn.AvgPool2d(kernel_size=2, stride=2)
             self.pool2 = nn.AvgPool2d(kernel_size=2, stride=2)
             self.pool3 = nn.AvgPool2d(kernel_size=2, stride=2)

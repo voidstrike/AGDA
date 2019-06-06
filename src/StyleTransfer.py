@@ -11,7 +11,7 @@ from PIL import Image
 
 # pre and post processing for images
 img_size = 512
-prep = tfs.Compose([tfs.Scale(img_size),
+prep = tfs.Compose([tfs.Resize(img_size),
                     tfs.ToTensor(),
                     tfs.Lambda(lambda x: x[torch.LongTensor([2, 1, 0])]),  # turn to BGR
                     tfs.Normalize(mean=[0.40760392, 0.45795686, 0.48501961], std=[1, 1, 1]),
@@ -36,12 +36,16 @@ def main():
     tgt_model = MultiVGG19(pivot_vgg)
     tgt_model.batch_required_grad(False)
 
+    if torch.cuda.is_available():
+        tgt_model = tgt_model.cuda()
+
     style_layers = ['r11', 'r21', 'r31', 'r41', 'r51']
     content_layers = ['r42']
 
     data_path = os.getcwd() + "/../data/style_transfer/"
     style_image = data_path + "style_img/" + "vangogh_starry_night.jpg"
     content_image = data_path + "content_img/" + "Tuebingen_Neckarfront.jpg"
+    output_image = data_path + "output/" + "test.jpg"
     imgs = [Image.open(style_image), Image.open(content_image)]
 
     imgs_torch = [prep(img) for img in imgs]
@@ -52,19 +56,20 @@ def main():
     style_image, content_image = imgs_torch
 
     # Initialize the 'white noisy' image by clone current content img
+    #opt_img = Variable(torch.randn(content_image.size()).type_as(content_image.data), requires_grad=True)
     opt_img = Variable(content_image.data.clone(), requires_grad=True)
 
     # Pre-defined weight vector from the paper
     style_weights = [1e3 / n ** 2 for n in [64, 128, 256, 512, 512]]
+    #style_weights = [1e3 / n ** 2 for n in [32, 64, 128, 256, 256]]
     content_weights = [1e0]
 
     # compute optimization targets
     style_targets = [A.detach() for A in tgt_model(style_image, style_layers, gram_flag=True)]
     content_targets = [A.detach() for A in tgt_model(content_image, content_layers)]
 
-    opt_img = None
-    optimizer = optim.LBFGS(opt_img)
-    criterion = nn.MSELoss()
+    optimizer = optim.LBFGS([opt_img])
+    criterion = nn.MSELoss(reduction='sum')
     max_iter = 500
     show_iter = 50
     n_iter = [0]
@@ -88,16 +93,16 @@ def main():
             n_iter[0] += 1
             # print loss
             if n_iter[0] % show_iter == (show_iter - 1):
-                print('Iteration: %d, loss: %f' % (n_iter[0] + 1, loss.data[0]))
+                print('Iteration: %d, loss: %f' % (n_iter[0] + 1, loss.item()))
             return loss
 
         optimizer.step(closure)
 
     out_img = img_clip(opt_img.data[0].cpu().squeeze())
+    out_img.save(output_image)
     plt.imshow(out_img)
     plt.gcf().set_size_inches(10, 10)
 
 
-
-
-
+if __name__ == "__main__":
+    main()
