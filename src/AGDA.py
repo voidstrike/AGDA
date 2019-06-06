@@ -20,16 +20,16 @@ from usps import USPS
 from torchvision.models import alexnet
 
 
-# Auxiliary function that forward input through in_model once
-def forwardByModelType(in_model, in_vec, psize=params.input_img_size, pchannel=1):
+# Aux_func s.t. passing input img to target model via its type
+def forwardByModelType(in_model, in_vec, p_size=params.input_img_size, p_channel=params.input_img_channel):
     if not isinstance(in_model, LinearAE):
-        code, rec = in_model(in_vec.view(-1, pchannel, psize, psize))
+        code, rec = in_model(in_vec.view(-1, p_channel, p_size, p_size))
     else:
-        code, rec = in_model(in_vec)
+        code, rec = in_model(in_vec.view(in_vec.shape[0], -1))
     return code, rec
 
 
-# Auxiliary function that return corresponding model
+# Aux_func s.t. returns specific model via the value of hidden dimension
 def getModelByDimension(t_dim, office_flag=False):
     ae, clf, dis = None, None, None
 
@@ -70,9 +70,9 @@ def getModelByDimension(t_dim, office_flag=False):
 
 # Auxiliary function that return the number of correct prediction
 def getHitCount(t_label, p_label):
-    _, p_label = p_label.max(1)
-    num_correct = (t_label == p_label).sum().item()
-    return num_correct
+        _, p_label = p_label.max(1)
+        num_correct = (t_label == p_label).sum().item()
+        return num_correct
 
 
 # Auxiliary function that returns the AE Loss and Classifier Loss
@@ -278,7 +278,7 @@ def main(load_model=False, hidden_dim=100, cuda_flag=False):
                 optimizer_D.zero_grad()
 
                 src_domain_label = target_dis(src_code)
-                tgt_domain_label = target_dis(tgt_code)
+                tgt_domain_label = target_dis(tgt_code.detach())
 
                 over_all_domain_label = torch.cat((src_domain_label, tgt_domain_label), 0)
                 over_all_domain_valid = torch.cat((src_valid, tgt_fake), 0)

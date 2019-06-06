@@ -104,27 +104,10 @@ def getModelPerformance(in_dl, in_ae, in_clf, ae_criterion):
 def getDataLoader(ds_name, root_path, train=True):
     target_dl, target_dl_fusion = None, None
 
-    # Get data set by their name
-    if ds_name == "mnist":
-        if params.input_img_size == 28:
-            data_set = MNIST(root_path + '/../data/mnist',  train=train, transform=ptf.directly_tfs, download=True)
-        else:
-            data_set = MNIST(root_path + '/../data/mnist',  train=train, transform=ptf.tfs_32, download=True)
-    elif ds_name == "usps":
-        data_set = USPS(root_path + '/../data', train=train, transform=ptf.directly_tfs, download=True)
-    elif ds_name == "svhn":
-        if params.input_img_size == 28:
-            # data_set = GSVHN(root_path + '/../data/svhn', split='train' if train else 'test',
-            data_set = SVHN(root_path + '/../data/svhn', split='train' if train else 'test',
-                             transform=ptf.tfs_28_gray, download=True)
-        else:
-            data_set = SVHN(root_path + '/../data/svhn', split='train' if train else 'test',
-                             transform=ptf.tfs_32_gray, download=True)
-
-    elif ds_name == "amazon" or ds_name == "webcam" or ds_name == "dslr":
+    if ds_name == "amazon" or ds_name == "webcam" or ds_name == "dslr":
         tmp_path = root_path + '/../data/office/'
         tmp_path += 'train/' if train else 'test/'
-        data_set = datasets.ImageFolder(tmp_path + ds_name + "/", transform=ptf.tfs_227)
+        data_set = datasets.ImageFolder(tmp_path + ds_name + "/", transform=ptf.tfs_227_norm)
     else:
         raise Exception("Unsupported Dataset")
 

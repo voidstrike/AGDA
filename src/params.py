@@ -5,7 +5,7 @@ data_root = "data"
 # TODO
 # batch_size must equal fusion_size for early fusion model
 batch_size = 128
-fusion_size = 256
+fusion_size = 64
 image_size = 64
 dim_set = [-2, -1, 100, 400, 500, 800]
 
@@ -15,9 +15,10 @@ tgt_encoder_restore = "snapshots/ADDA-target-encoder-final.pt"
 tgt_model_trained = True
 
 # params for data set selection
-source_data_set = "dslr"
-target_data_set = "dslr"
+source_data_set = "mnist"
+target_data_set = "usps"
 input_img_size = 28
+input_img_channel = 1
 
 # params for model training
 clf_train_iter = 1          # Number of iterations to train the source domain AE + CLF

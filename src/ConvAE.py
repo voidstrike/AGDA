@@ -88,10 +88,11 @@ class ExLeNetAE28(nn.Module):
         # Decoder Network
         self.decoder_cnn = nn.Sequential(
             nn.ConvTranspose2d(50, 20, 6, stride=2),  # (b, 20, 12, 12)
+            nn.BatchNorm2d(20),
             nn.ReLU(True),
             nn.ConvTranspose2d(20, 1, 6, stride=2),  # (b, 1, 28, 28)
-            nn.ReLU(True),
-            nn.Tanh()
+            nn.Sigmoid()
+            # nn.Tanh()
         )
 
         for module in self.modules():
@@ -177,7 +178,7 @@ class LeNetAE32(nn.Module):
 
 # TODO
 class ExAlexNet(nn.Module):
-    def __init__(self, feature_extractor=None):
+    def __init__(self, feature_extractor=None, inter_norm=False):
         super(ExAlexNet, self).__init__()
 
         self.conv1 = nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2)
@@ -194,6 +195,8 @@ class ExAlexNet(nn.Module):
         self.relu5 = nn.ReLU(inplace=True)
         self.pool3 = nn.MaxPool2d(kernel_size=3, stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d(6)
+
+        self.extra_norm = nn.BatchNorm2d(384, track_running_stats=False)
 
         if feature_extractor is not None:
             tmp_count = 1
@@ -217,9 +220,11 @@ class ExAlexNet(nn.Module):
 
         self.decoder = nn.Sequential(
             nn.ConvTranspose2d(256, 256, kernel_size=4, stride=1),
+            nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(256, 384, kernel_size=5, stride=1),
-            nn.Tanh()
+            nn.Sigmoid()
+            # nn.Tanh()
         )
 
 
@@ -232,7 +237,11 @@ class ExAlexNet(nn.Module):
         x = self.pool2(x)
         x = self.conv3(x)
         x = self.relu3(x)
-        intermediate_img = x
+
+        if self.extra_norm:
+            intermediate_img = self.extra_norm(x)
+        else:
+            intermediate_img = x
 
         x = self.conv4(x)
         x = self.relu4(x)
