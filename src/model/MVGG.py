@@ -1,6 +1,19 @@
-from torch import nn
+import torch
 import torch.nn.functional as F
+from torch import nn
 from torchvision.models import vgg19
+
+
+# Auxiliary Gram Matrix Layer that compute the Gram Matrix if required
+class GramMatrixLayer(nn.Module):
+    def __init__(self):
+        super(GramMatrixLayer, self).__init__()
+
+    def forward(self, x):
+        b, c, h, w = x.size()
+        feature = x.view(b, c, h * w)
+        mat = torch.bmm(feature, feature.transpose(1, 2))
+        return mat.div_(h * w)
 
 
 # Modified VGG-19 that can output activations of selected layers
@@ -42,7 +55,10 @@ class MultiVGG19(nn.Module):
             self.pool4 = nn.AvgPool2d(kernel_size=2, stride=2)
             self.pool5 = nn.AvgPool2d(kernel_size=2, stride=2)
 
-    def forward(self, x, out_keys):
+        # Auxiliary Layer that computes Gram Matrix when required
+        self.gram_layer = GramMatrixLayer()
+
+    def forward(self, x, out_keys, gram_flag=False):
         out = dict()
         out['r11'] = F.relu(self.conv1_1(x))
         out['r12'] = F.relu(self.conv1_2(out['r11']))
@@ -65,7 +81,11 @@ class MultiVGG19(nn.Module):
         out['r53'] = F.relu(self.conv5_3(out['r52']))
         out['r54'] = F.relu(self.conv5_4(out['r53']))
         out['p5'] = self.pool5(out['r54'])
-        return [out[key] for key in out_keys]
+
+        if gram_flag:
+            return [self.gram_layer(out[key]) for key in out_keys]
+        else:
+            return [out[key] for key in out_keys]
 
     # Copy the weight & bias from other trained VGG-19 model (Same structure in torch model zoo)
     def weight_from_model_zoo(self, tgt):
@@ -86,7 +106,10 @@ class MultiVGG19(nn.Module):
         self.conv5_2.weight, self.conv5_2.bias = fe[30].weight, fe[30].bias
         self.conv5_3.weight, self.conv5_3.bias = fe[32].weight, fe[32].bias
         self.conv5_4.weight, self.conv5_4.bias = fe[34].weight, fe[34].bias
-        pass
+
+    def batch_required_grad(self, flag=False):
+        for each_param in self.parameters():
+            each_param.requires_grad = flag
 
 
 def main():
