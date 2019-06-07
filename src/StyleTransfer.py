@@ -68,50 +68,36 @@ def main():
     style_targets = [A.detach() for A in tgt_model(style_image, style_layers, gram_flag=True)]
     content_targets = [A.detach() for A in tgt_model(content_image, content_layers)]
 
-    # optimizer = optim.LBFGS([opt_img])
-    optimizer = optim.Adam([opt_img])
+    optimizer = optim.LBFGS([opt_img])
+    # optimizer = optim.Adam([opt_img])
     criterion = nn.MSELoss(reduction='sum')
     max_iter = 500
     show_iter = 50
     n_iter = [0]
 
-    # while n_iter[0] <= max_iter:
-    #
-    #     def closure():
-    #         optimizer.zero_grad()
-    #         # Forward once
-    #         # out = tgt_model(opt_img, loss_layers)
-    #         style_out = tgt_model(opt_img, style_layers, gram_flag=True)
-    #         content_out = tgt_model(opt_img, content_layers)
-    #
-    #         # Compute the loss respectively
-    #         style_loss = [style_weights[idx] * criterion(x, style_targets[idx]) for idx, x in enumerate(style_out)]
-    #         content_loss = [content_weights[idx] * criterion(x, content_targets[idx]) for idx, x in enumerate(content_out)]
-    #         final_loss = style_loss + content_loss
-    #         # layer_losses = [weights[a] * loss_fns[a](A, targets[a]) for a, A in enumerate(out)]
-    #         loss = sum(final_loss)
-    #         loss.backward()
-    #         n_iter[0] += 1
-    #         # print loss
-    #         if n_iter[0] % show_iter == (show_iter - 1):
-    #             print('Iteration: %d, loss: %f' % (n_iter[0] + 1, loss.item()))
-    #         return loss
-    #
-    #     optimizer.step(closure)
-
     while n_iter[0] <= max_iter:
-        optimizer.zero_grad()
-        style_out = tgt_model(opt_img, style_layers, gram_flag=True)
-        content_out = tgt_model(opt_img, content_layers)
-        style_loss = [style_weights[idx] * criterion(x, style_targets[idx]) for idx, x in enumerate(style_out)]
-        content_loss = [content_weights[idx] * criterion(x, content_targets[idx]) for idx, x in enumerate(content_out)]
-        final_loss = style_loss + content_loss
-        loss = sum(final_loss)
-        loss.backward()
-        n_iter[0] += 1
-        # print loss
-        if n_iter[0] % show_iter == (show_iter - 1):
-            print('Iteration: %d, loss: %f' % (n_iter[0] + 1, loss.item()))
+
+        def closure():
+            optimizer.zero_grad()
+            # Forward once
+            # out = tgt_model(opt_img, loss_layers)
+            style_out = tgt_model(opt_img, style_layers, gram_flag=True)
+            content_out = tgt_model(opt_img, content_layers)
+
+            # Compute the loss respectively
+            style_loss = [style_weights[idx] * criterion(x, style_targets[idx]) for idx, x in enumerate(style_out)]
+            content_loss = [content_weights[idx] * criterion(x, content_targets[idx]) for idx, x in enumerate(content_out)]
+            final_loss = style_loss + content_loss
+            # layer_losses = [weights[a] * loss_fns[a](A, targets[a]) for a, A in enumerate(out)]
+            loss = sum(final_loss)
+            loss.backward()
+            n_iter[0] += 1
+            # print loss
+            if n_iter[0] % show_iter == (show_iter - 1):
+                print('Iteration: %d, loss: %f' % (n_iter[0] + 1, loss.item()))
+            return loss
+
+        optimizer.step(closure)
         
     out_img = img_clip(opt_img.data[0].cpu().squeeze())
     out_img.save(output_image)
