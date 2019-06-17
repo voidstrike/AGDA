@@ -43,6 +43,24 @@ def compute_kl(mu):
     return loss
 
 
+def sample_cycle_image(current_epoch, dl1, dl2, E1, E2, G1, G2):
+    """Saves a generated sample from the test set"""
+    for _, ((f1, _), (f2, _)) in enumerate(zip(dl1, dl2)):
+        if torch.cuda.is_available():
+            X1 = Variable(f1.type(torch.Tensor).cuda())
+            X2 = Variable(f2.type(torch.Tensor).cuda())
+        else:
+            X1 = Variable(f1.type(torch.Tensor))
+            X2 = Variable(f2.type(torch.Tensor))
+
+        _, Z1 = E1(X1)
+        _, Z2 = E2(X2)
+        fake_X1 = G1(Z2)
+        fake_X2 = G2(Z1)
+        img_sample = torch.cat((X1.data, fake_X2.data, X2.data, fake_X1.data), 0)
+        save_image(img_sample, "images/%s/%s.png" % ("test", current_epoch), nrow=5, normalize=True)
+
+
 def main():
     # Specify input shape
     input_shape = (3, 256, 256)
@@ -231,6 +249,9 @@ def main():
             lr_scheduler_D1.step()
         if lr_scheduler_D2 is not None:
             lr_scheduler_D2.step()
+
+        if current_epoch % 10 == 0:
+            sample_cycle_image(current_epoch, traX, traY, E1, E2, G1, G2)
 
 
 if __name__ == "__main__":
