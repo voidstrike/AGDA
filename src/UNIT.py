@@ -104,15 +104,15 @@ def main():
     Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
 
     # Temporary Image Transformation
-    transforms_ = [
+    t_trans_ = transforms.Compose([
         transforms.Resize(int(input_shape[1] * 1.12)),
         transforms.RandomCrop((input_shape[1], input_shape[2])),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    ]
+    ])
 
-    traX, traY, tesX, tesY = get_all_data_loader(os.getcwd(), transforms, 32)
+    traX, traY, tesX, tesY = get_all_data_loader(os.getcwd(), t_trans_, 1)
 
     prev_time = time.time()
 
@@ -120,8 +120,11 @@ def main():
     #  Train Encoders and Generators (Decoders)
     # -------------------------------
 
+    for idx, ((f1, l1), (f2, l2)) in enumerate(zip(traX, traY)):
+        print(f1.shape)
+
     for current_epoch in range(n_epochs):
-        for pivot, (train_img_X, train_img_Y) in enumerate(zip(traX, traY)):
+        for pivot, ((train_img_X, _), (train_img_Y, _)) in enumerate(zip(traX, traY)):
             if torch.cuda.is_available():
                 X1 = Variable(train_img_X.type(Tensor).cuda())
                 X2 = Variable(train_img_Y.type(Tensor).cuda())
@@ -216,9 +219,9 @@ def main():
             prev_time = time.time()
 
             # Print log
-            sys.stdout.write(
+            print(
                 "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] ETA: %s"
-                % (epoch, n_epochs, pivot, len(traX), (loss_D1 + loss_D2).item(), loss_G.item(), time_left)
+                % (current_epoch, n_epochs, pivot, len(traX), (loss_D1 + loss_D2).item(), loss_G.item(), time_left)
             )
 
             # Update learning rates
