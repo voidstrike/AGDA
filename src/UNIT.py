@@ -44,8 +44,8 @@ def compute_kl(mu):
 def sample_cycle_image(current_epoch, dl1, dl2, E1, E2, G1, G2):
     # Test Purpose : Randomly select one img each training domain to perform the cycle transfer
     f1_len, f2_len = dl1.dataset.__len__(), dl2.dataset.__len__()
-    f1 = dl1.dataset[random.randint(0, f1_len - 1)][0]
-    f2 = dl2.dataset[random.randint(0, f2_len - 1)][0]
+    f1 = dl1.dataset[random.randint(0, f1_len - 1)][0].unsqueeze(0)
+    f2 = dl2.dataset[random.randint(0, f2_len - 1)][0].unsqueeze(0)
 
     if torch.cuda.is_available():
         X1 = Variable(f1.type(torch.Tensor).cuda())
@@ -71,7 +71,7 @@ def main():
     learning_rate = 1e-4
     n_downsample = 2
     shared_dim = dim * 2 ** n_downsample
-    n_epochs = 200
+    n_epochs = 2000
     epoch = 0
     decay_epoch = 100
     global_batch_size = 1
@@ -253,7 +253,7 @@ def main():
         if lr_scheduler_D2 is not None:
             lr_scheduler_D2.step()
 
-        if current_epoch % 10 == 0:
+        if current_epoch % 100 == 0:
             sample_cycle_image(current_epoch, traX, traY, E1, E2, G1, G2)
 
 
