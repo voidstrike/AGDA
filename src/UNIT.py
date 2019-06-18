@@ -17,7 +17,7 @@ from torch.autograd import Variable
 from torch.optim import lr_scheduler
 
 
-def get_all_data_loader(root_path, transformer, batch_size=32):
+def get_all_data_loader(root_path, transformer, batch_size=1):
     root_path = os.path.join(root_path, '../data/unit')
 
     train_x = get_data_loader_folder(os.path.join(root_path, 'trainX/'), transformer, batch_size)
@@ -42,10 +42,9 @@ def compute_kl(mu):
 
 
 def sample_cycle_image(current_epoch, dl1, dl2, E1, E2, G1, G2):
-    # Test Purpose : Randomly select one img each training domain to perform the cycle transfer
-    f1_len, f2_len = dl1.dataset.__len__(), dl2.dataset.__len__()
-    f1 = dl1.dataset[random.randint(0, f1_len - 1)][0].unsqueeze(0)
-    f2 = dl2.dataset[random.randint(0, f2_len - 1)][0].unsqueeze(0)
+    # Randomly select one img each domain then perform the transfer process
+    f1 = dl1.dataset[random.randint(0, dl1.dataset.__len__() - 1)][0].unsqueeze(0)
+    f2 = dl2.dataset[random.randint(0, dl2.dataset.__len__() - 1)][0].unsqueeze(0)
 
     if torch.cuda.is_available():
         X1 = Variable(f1.type(torch.Tensor).cuda())
@@ -65,23 +64,23 @@ def sample_cycle_image(current_epoch, dl1, dl2, E1, E2, G1, G2):
 
 
 def main():
-    # Specify input shape
+    # Basic program setting
     input_shape = (3, 256, 256)
-    dim = 64  # Number of filters in the first Conv layer
     learning_rate = 1e-4
+    dim = 64  # Number of filters of the first Conv layer
     n_downsample = 2
     shared_dim = dim * 2 ** n_downsample
     n_epochs = 2000
-    epoch = 0
-    decay_epoch = 100
-    global_batch_size = 1
-    # Initialize generator and discriminator
+    scheduler_flag = False
 
+    global_batch_size = 1
+
+    # Initialize generator and discriminator
     shared_E = ResidualBlock(features=shared_dim)
     E1 = Encoder(dim=dim, n_downsample=n_downsample, shared_block=shared_E)
     E2 = Encoder(dim=dim, n_downsample=n_downsample, shared_block=shared_E)
-    shared_G = ResidualBlock(features=shared_dim)
 
+    shared_G = ResidualBlock(features=shared_dim)
     G1 = Decoder(dim=dim, n_upsample=n_downsample, shared_block=shared_G)
     G2 = Decoder(dim=dim, n_upsample=n_downsample, shared_block=shared_G)
 
@@ -114,13 +113,18 @@ def main():
         lr=learning_rate,
         betas=(.5, .999),
     )
-    optimizer_D1 = torch.optim.Adam(D1.parameters(), lr=learning_rate, betas=(.5, .999))
-    optimizer_D2 = torch.optim.Adam(D2.parameters(), lr=learning_rate, betas=(.5, .999))
+    optimizer_D1 = torch.optim.Adam(D1.parameters(), lr=learning_rate, betas=(.5, .999), weight_decay=1e-4)
+    optimizer_D2 = torch.optim.Adam(D2.parameters(), lr=learning_rate, betas=(.5, .999), weight_decay=1e-4)
 
     # Learning rate update schedulers -- Currently set to constant
     lr_scheduler_G = None
     lr_scheduler_D1 = None
     lr_scheduler_D2 = None
+
+    if scheduler_flag:
+        lr_scheduler_G = lr_scheduler.StepLR(optimizer_G, step_size=1000, gamma=.5, last_epoch=-1)
+        lr_scheduler_D1 = lr_scheduler.StepLR(optimizer_D1, step_size=1000, gamma=.5, last_epoch=-1)
+        lr_scheduler_D2 = lr_scheduler.StepLR(optimizer_D2, step_size=1000, gamma=.5, last_epoch=-1)
 
     Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
 
@@ -140,9 +144,6 @@ def main():
     # -------------------------------
     #  Train Encoders and Generators (Decoders)
     # -------------------------------
-
-    for idx, ((f1, l1), (f2, l2)) in enumerate(zip(traX, traY)):
-        print(f1.shape)
 
     for current_epoch in range(n_epochs):
         for pivot, ((train_img_X, _), (train_img_Y, _)) in enumerate(zip(traX, traY)):
@@ -172,21 +173,31 @@ def main():
             fake_X1 = G1(Z2)
             fake_X2 = G2(Z1)
 
-            # Cycle translation
+            # Perform cycle translation
             mu1_, Z1_ = E1(fake_X1)
             mu2_, Z2_ = E2(fake_X2)
+
             cyc_X1 = G1(Z2_)
             cyc_X2 = G2(Z1_)
 
             # Losses
+            # Losses that discriminator can distinguish fake & real images
             loss_GAN_1 = lambda_0 * criterion_GAN(D1(fake_X1), valid)
             loss_GAN_2 = lambda_0 * criterion_GAN(D2(fake_X2), valid)
+
+            # KL loss for reconstruction
             loss_KL_1 = lambda_1 * compute_kl(mu1)
             loss_KL_2 = lambda_1 * compute_kl(mu2)
+
+            # Reconstruction Loss
             loss_ID_1 = lambda_2 * criterion_pixel(rec_X1, X1)
             loss_ID_2 = lambda_2 * criterion_pixel(rec_X2, X2)
+
+            # KL loss for circle consistency
             loss_KL_1_ = lambda_3 * compute_kl(mu1_)
             loss_KL_2_ = lambda_3 * compute_kl(mu2_)
+
+            # Circle reconstruction loss
             loss_cyc_1 = lambda_4 * criterion_pixel(cyc_X1, X1)
             loss_cyc_2 = lambda_4 * criterion_pixel(cyc_X2, X2)
 
@@ -214,8 +225,8 @@ def main():
             optimizer_D1.zero_grad()
 
             loss_D1 = criterion_GAN(D1(X1), valid) + criterion_GAN(D1(fake_X1.detach()), fake)
-
             loss_D1.backward()
+
             optimizer_D1.step()
 
             # -----------------------
@@ -225,8 +236,8 @@ def main():
             optimizer_D2.zero_grad()
 
             loss_D2 = criterion_GAN(D2(X2), valid) + criterion_GAN(D2(fake_X2.detach()), fake)
-
             loss_D2.backward()
+
             optimizer_D2.step()
 
             # --------------
