@@ -76,11 +76,11 @@ def main():
     global_batch_size = 1
 
     # Initialize generator and discriminator
-    shared_E = ResidualBlock(features=shared_dim)
+    shared_E = ResidualBlock(features=shared_dim, drop_out=.5)
     E1 = Encoder(dim=dim, n_downsample=n_downsample, shared_block=shared_E)
     E2 = Encoder(dim=dim, n_downsample=n_downsample, shared_block=shared_E)
 
-    shared_G = ResidualBlock(features=shared_dim)
+    shared_G = ResidualBlock(features=shared_dim, drop_out=.5)
     G1 = Decoder(dim=dim, n_upsample=n_downsample, shared_block=shared_G)
     G2 = Decoder(dim=dim, n_upsample=n_downsample, shared_block=shared_G)
 

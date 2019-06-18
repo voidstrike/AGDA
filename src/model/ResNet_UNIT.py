@@ -4,19 +4,21 @@ import torch
 from torch.autograd import Variable
 import numpy as np
 
+
 class ResidualBlock(nn.Module):
-    def __init__(self, features):
+    def __init__(self, features, drop_out=.0):
         super(ResidualBlock, self).__init__()
 
         conv_block = [
-            nn.ReflectionPad2d(1),
-            nn.Conv2d(features, features, 3),
+            nn.Conv2d(features, features, 3, padding=1),
             nn.InstanceNorm2d(features),
             nn.ReLU(inplace=True),
-            nn.ReflectionPad2d(1),
-            nn.Conv2d(features, features, 3),
+            nn.Conv2d(features, features, 3, padding=1),
             nn.InstanceNorm2d(features),
         ]
+
+        if drop_out != .0:
+            conv_block.append(nn.Dropout(p=drop_out))
 
         self.conv_block = nn.Sequential(*conv_block)
 
@@ -25,7 +27,8 @@ class ResidualBlock(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, in_channels=3, dim=64, n_downsample=2, shared_block=None):
+    # Structure in the paper : 3 Conv layers + 4 residual blocks
+    def __init__(self, in_channels=3, dim=64, n_downsample=2, shared_block=None, drop_out=.5):
         super(Encoder, self).__init__()
 
         # Initial convolution block
@@ -39,7 +42,7 @@ class Encoder(nn.Module):
         # Downsampling
         for _ in range(n_downsample):
             layers += [
-                nn.Conv2d(dim, dim * 2, 4, stride=2, padding=1),
+                nn.Conv2d(dim, dim * 2, 3, stride=2, padding=1),
                 nn.InstanceNorm2d(dim * 2),
                 nn.ReLU(inplace=True),
             ]
@@ -47,7 +50,7 @@ class Encoder(nn.Module):
 
         # Residual blocks
         for _ in range(3):
-            layers += [ResidualBlock(dim)]
+            layers += [ResidualBlock(dim, drop_out=drop_out)]
 
         self.model_blocks = nn.Sequential(*layers)
         self.shared_block = shared_block
@@ -66,7 +69,7 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, out_channels=3, dim=64, n_upsample=2, shared_block=None):
+    def __init__(self, out_channels=3, dim=64, n_upsample=2, shared_block=None, drop_out=.5):
         super(Decoder, self).__init__()
 
         self.shared_block = shared_block
@@ -75,19 +78,19 @@ class Decoder(nn.Module):
         dim = dim * 2 ** n_upsample
         # Residual blocks
         for _ in range(3):
-            layers += [ResidualBlock(dim)]
+            layers += [ResidualBlock(dim, drop_out=drop_out)]
 
         # Up-sampling
         for _ in range(n_upsample):
             layers += [
-                nn.ConvTranspose2d(dim, dim // 2, 4, stride=2, padding=1),
+                nn.ConvTranspose2d(dim, dim // 2, 3, stride=2, padding=1, output_padding=1),
                 nn.InstanceNorm2d(dim // 2),
-                nn.LeakyReLU(0.2, inplace=True),
+                nn.ReLU(inplace=True),
             ]
             dim = dim // 2
 
         # Output layer
-        layers += [nn.ReflectionPad2d(3), nn.Conv2d(dim, out_channels, 7), nn.Tanh()]
+        layers += [nn.Conv2d(dim, out_channels, 1, stride=1), nn.Tanh()]
 
         self.model_blocks = nn.Sequential(*layers)
 
@@ -101,7 +104,7 @@ class DisBlock(nn.Module):
     def __init__(self, in_filters, out_filters, normalize=True):
         super(DisBlock, self).__init__()
         # Basic Discriminator Block -> kernel_size=4 & stride=2 => reduce the height & width by half
-        layers = [nn.Conv2d(in_filters, out_filters, 4, stride=2, padding=1)]
+        layers = [nn.Conv2d(in_filters, out_filters, 3, stride=2, padding=1)]
         if normalize:
             layers.append(nn.InstanceNorm2d(out_filters))
         layers.append(nn.LeakyReLU(.2, inplace=True))
@@ -116,14 +119,13 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         channels, height, width = input_shape
         # Calculate output of image discriminator (PatchGAN)
-        self.output_shape = (1, height // 2 ** 4, width // 2 ** 4)
+        self.output_shape = (1, height // 2 ** 3, width // 2 ** 3)
 
         self.model = nn.Sequential(
             DisBlock(channels, 64, normalize=False),
             DisBlock(64, 128),
             DisBlock(128, 256),
-            DisBlock(256, 512),
-            nn.Conv2d(512, 1, 3, padding=1)
+            nn.Conv2d(256, 1, 1)
         )
 
     def forward(self, img):
