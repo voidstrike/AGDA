@@ -2,18 +2,16 @@
 
 from model.ResNet_UNIT import *
 
-import math
 import os
 import itertools
 import torchvision.transforms as transforms
 import datetime
 import time
-import sys
-from torchvision.utils import save_image
+import random
 
+from torchvision.utils import save_image
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
-from torchvision import datasets
 from torch.autograd import Variable
 
 from torch.optim import lr_scheduler
@@ -44,21 +42,26 @@ def compute_kl(mu):
 
 
 def sample_cycle_image(current_epoch, dl1, dl2, E1, E2, G1, G2):
-    """Saves a generated sample from the test set"""
-    for _, ((f1, _), (f2, _)) in enumerate(zip(dl1, dl2)):
-        if torch.cuda.is_available():
-            X1 = Variable(f1.type(torch.Tensor).cuda())
-            X2 = Variable(f2.type(torch.Tensor).cuda())
-        else:
-            X1 = Variable(f1.type(torch.Tensor))
-            X2 = Variable(f2.type(torch.Tensor))
+    # Test Purpose : Randomly select one img each training domain to perform the cycle transfer
+    f1_len, f2_len = dl1.dataset.__len__(), dl2.dataset.__len__()
+    f1 = dl1.dataset[random.randint(0, f1_len - 1)][0]
+    f2 = dl2.dataset[random.randint(0, f2_len - 1)][0]
 
-        _, Z1 = E1(X1)
-        _, Z2 = E2(X2)
-        fake_X1 = G1(Z2)
-        fake_X2 = G2(Z1)
-        img_sample = torch.cat((X1.data, fake_X2.data, X2.data, fake_X1.data), 0)
-        save_image(img_sample, "images/%s/%s.png" % ("test", current_epoch), nrow=5, normalize=True)
+    if torch.cuda.is_available():
+        X1 = Variable(f1.type(torch.Tensor).cuda())
+        X2 = Variable(f2.type(torch.Tensor).cuda())
+    else:
+        X1 = Variable(f1.type(torch.Tensor))
+        X2 = Variable(f2.type(torch.Tensor))
+
+    _, Z1 = E1(X1)
+    _, Z2 = E2(X2)
+
+    fake_X1 = G1(Z2)
+    fake_X2 = G2(Z1)
+
+    img_sample = torch.cat((X1.data, fake_X2.data, X2.data, fake_X1.data), 0)
+    save_image(img_sample, "images/%s/%s.png" % ("test", current_epoch), nrow=5, normalize=True)
 
 
 def main():

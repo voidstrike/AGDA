@@ -77,7 +77,7 @@ class Decoder(nn.Module):
         for _ in range(3):
             layers += [ResidualBlock(dim)]
 
-        # Upsampling
+        # Up-sampling
         for _ in range(n_upsample):
             layers += [
                 nn.ConvTranspose2d(dim, dim // 2, 4, stride=2, padding=1),
