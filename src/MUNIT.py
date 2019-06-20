@@ -8,6 +8,7 @@ import torchvision.transforms as transforms
 import datetime
 import time
 import random
+import argparse
 import numpy as np
 
 from torchvision.utils import save_image
@@ -16,6 +17,21 @@ from torchvision.datasets import ImageFolder
 from torch.autograd import Variable
 
 from torch.optim import lr_scheduler
+
+
+class ConcatDataset(torch.utils.data.Dataset):
+    # Temp Concat of two data_set with different length
+    def __init__(self, *datasets):
+        self.datasets = datasets
+        self.len_list = [len(d) for d in self.datasets]
+        # self.max_len = max(len(d) for d in self.datasets)
+        # self.min_len = min(len(d) for d in self.datasets)
+
+    def __getitem__(self, i):
+        return tuple(d[i % self.len_list[idx]] for idx, d in enumerate(self.datasets))
+
+    def __len__(self):
+        return max(self.len_list)
 
 
 def get_all_data_loader(root_path, transformer, batch_size=1):
@@ -27,7 +43,17 @@ def get_all_data_loader(root_path, transformer, batch_size=1):
     train_y = get_data_loader_folder(os.path.join(root_path, 'trainY/'), transformer, batch_size)
     test_y = get_data_loader_folder(os.path.join(root_path, 'testY/'), transformer, batch_size, shuffle=False)
 
-    return train_x, train_y, test_x, test_y
+    extra_loader = DataLoader(
+        ConcatDataset(
+            ImageFolder(os.path.join(root_path, 'trainX/'), transform=transformer),
+            ImageFolder(os.path.join(root_path, 'trainY/'), transform=transformer)
+        ),
+        batch_size,
+        shuffle=True,
+        drop_last=True
+    )
+
+    return train_x, train_y, test_x, test_y, extra_loader
 
 
 def get_data_loader_folder(input_folder, transformer, batch_size, shuffle=True):
@@ -41,6 +67,12 @@ def sample_cycle_image(current_epoch, dl1, dl2, E1, E2, G1, G2):
     f1 = dl1.dataset[random.randint(0, dl1.dataset.__len__() - 1)][0].unsqueeze(0)
     f2 = dl2.dataset[random.randint(0, dl2.dataset.__len__() - 1)][0].unsqueeze(0)
 
+    # Set model to eval mode:
+    E1.eval()
+    E2.eval()
+    G1.eval()
+    G2.eval()
+
     if torch.cuda.is_available():
         X1 = Variable(f1.type(torch.Tensor).cuda())
         X2 = Variable(f2.type(torch.Tensor).cuda())
@@ -51,14 +83,44 @@ def sample_cycle_image(current_epoch, dl1, dl2, E1, E2, G1, G2):
     C1, S1 = E1(X1)
     C2, S2 = E2(X2)
 
-    fake_X1 = G1(C2, X1)
-    fake_X2 = G2(C1, X2)
+    fake_X1 = G1(C2, S1)
+    fake_X2 = G2(C1, S2)
 
     img_sample = torch.cat((X1.data, fake_X2.data, X2.data, fake_X1.data), 0)
     save_image(img_sample, "images/%s/%s.png" % ("test2", current_epoch), nrow=5, normalize=True)
 
+    # Set model back to train model
+    E1.train()
+    E2.train()
+    G1.train()
+    G2.train()
 
-def main():
+
+def save_models(root_path, E1, E2, G1, G2, D1, D2):
+    torch.save(E1.state_dict(), root_path + "/../modeinfo/src_encoder.pt")
+    torch.save(E2.state_dict(), root_path + "/../modeinfo/tgt_encoder.pt")
+    torch.save(G1.state_dict(), root_path + "/../modeinfo/src_decoder.pt")
+    torch.save(G2.state_dict(), root_path + "/../modeinfo/tgt_decoder.pt")
+    torch.save(D1.state_dict(), root_path + "/../modeinfo/src_discriminator.pt")
+    torch.save(D2.state_dict(), root_path + "/../modeinfo/tgt_discriminator.pt")
+
+
+def load_models(root_path, E1, E2, G1, G2, D1, D2):
+    E1.load_state_dict(torch.load(root_path + "/../modeinfo/src_encoder.pt"))
+    E2.load_state_dict(torch.load(root_path + "/../modeinfo/tgt_encoder.pt"))
+    G1.load_state_dict(torch.load(root_path + "/../modeinfo/src_decoder.pt"))
+    G2.load_state_dict(torch.load(root_path + "/../modeinfo/tgt_decoder.pt"))
+    D1.load_state_dict(torch.load(root_path + "/../modeinfo/src_discriminator.pt"))
+    D2.load_state_dict(torch.load(root_path + "/../modeinfo/tgt_discriminator.pt"))
+    E1.eval()
+    E2.eval()
+    G1.eval()
+    G2.eval()
+    D1.eval()
+    D2.eval()
+
+
+def main(model_flag):
     # Basic program setting
     input_shape = (3, 256, 256)
     learning_rate = 1e-4
@@ -78,8 +140,11 @@ def main():
     G1 = Decoder(dim=dim, n_upsample=n_downsample, n_residual=4, style_dim=style_dim)
     G2 = Decoder(dim=dim, n_upsample=n_downsample, n_residual=4, style_dim=style_dim)
 
-    D1 = MultiDiscriminator(input_shape)
-    D2 = MultiDiscriminator(input_shape)
+    D1 = MultiDiscriminator(input_shape[0])
+    D2 = MultiDiscriminator(input_shape[0])
+
+    if model_flag:
+        load_models(os.getcwd(), E1, E2, G1, G2, D1, D2)
 
     criterion_GAN = torch.nn.MSELoss()
     criterion_pixel = torch.nn.L1Loss()
@@ -131,7 +196,7 @@ def main():
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
 
-    traX, traY, tesX, tesY = get_all_data_loader(os.getcwd(), t_trans_, 1)
+    traX, traY, tesX, tesY, extra= get_all_data_loader(os.getcwd(), t_trans_, 1)
 
     prev_time = time.time()
 
@@ -141,7 +206,8 @@ def main():
     valid, fake = 1, 0
 
     for current_epoch in range(n_epochs):
-        for pivot, ((train_img_X, _), (train_img_Y, _)) in enumerate(zip(traX, traY)):
+        # for pivot, ((train_img_X, _), (train_img_Y, _)) in enumerate(zip(traX, traY)):
+        for pivot, (train_img_X, _, train_img_Y, _) in enumerate(extra):
             if torch.cuda.is_available():
                 X1 = Variable(train_img_X.type(Tensor).cuda())
                 X2 = Variable(train_img_Y.type(Tensor).cuda())
@@ -166,7 +232,7 @@ def main():
 
             # Translate images
             fake_X1 = G1(CON2, STY1)
-            fake_X2 = G2(CON1, STY1)
+            fake_X2 = G2(CON1, STY2)
 
             # Perform cycle translation
             C_CON2, C_STY_1 = E1(fake_X1)
@@ -240,15 +306,15 @@ def main():
             # --------------
 
             # Determine approximate time left
-            batches_done = current_epoch * len(traX) + pivot * global_batch_size
-            batches_left = n_epochs * len(traX) - batches_done
+            batches_done = current_epoch * len(extra) + pivot * global_batch_size
+            batches_left = n_epochs * len(extra) - batches_done
             time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
             prev_time = time.time()
 
             # Print log
             print(
                 "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] ETA: %s"
-                % (current_epoch, n_epochs, pivot, len(traX), (loss_D1 + loss_D2).item(), loss_G.item(), time_left)
+                % (current_epoch, n_epochs, pivot, len(extra), (loss_D1 + loss_D2).item(), loss_G.item(), time_left)
             )
 
             # Update learning rates
@@ -262,6 +328,11 @@ def main():
         if current_epoch % 100 == 0:
             sample_cycle_image(current_epoch, traX, traY, E1, E2, G1, G2)
 
+    save_models(E1, E2, G1, G2, D1, D2)
+
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pretrained", type=bool, default=False, help="Whether the pre-trained model would be used")
+    opt = parser.parse_args()
+    main(opt.pretrained)
