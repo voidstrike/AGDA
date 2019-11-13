@@ -128,7 +128,7 @@ def main(model_flag):
     style_dim = 8
     n_downsample = 2
     shared_dim = dim * 2 ** n_downsample
-    n_epochs = 2000
+    n_epochs = 40
     scheduler_flag = False
 
     global_batch_size = 1
@@ -189,8 +189,9 @@ def main(model_flag):
 
     # Temporary Image Transformation
     t_trans_ = transforms.Compose([
-        transforms.Resize(int(input_shape[1] * 1.12)),
-        transforms.RandomCrop((input_shape[1], input_shape[2])),
+        #transforms.Resize(int(input_shape[1] * 1.12)),
+        #transforms.RandomCrop((input_shape[1], input_shape[2])),
+	transforms.CenterCrop((input_shape[1], input_shape[2])),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
@@ -207,7 +208,7 @@ def main(model_flag):
 
     for current_epoch in range(n_epochs):
         # for pivot, ((train_img_X, _), (train_img_Y, _)) in enumerate(zip(traX, traY)):
-        for pivot, (train_img_X, _, train_img_Y, _) in enumerate(extra):
+        for pivot, ((train_img_X, _), (train_img_Y, _)) in enumerate(extra):
             if torch.cuda.is_available():
                 X1 = Variable(train_img_X.type(Tensor).cuda())
                 X2 = Variable(train_img_Y.type(Tensor).cuda())
@@ -325,10 +326,10 @@ def main(model_flag):
         if lr_scheduler_D2 is not None:
             lr_scheduler_D2.step()
 
-        if current_epoch % 100 == 0:
+        if current_epoch % 1 == 0:
             sample_cycle_image(current_epoch, traX, traY, E1, E2, G1, G2)
 
-    save_models(E1, E2, G1, G2, D1, D2)
+    save_models(os.getcwd(), E1, E2, G1, G2, D1, D2)
 
 
 if __name__ == "__main__":

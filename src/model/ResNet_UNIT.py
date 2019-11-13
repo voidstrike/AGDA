@@ -1,5 +1,5 @@
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as func
 import torch
 from torch.autograd import Variable
 import numpy as np
@@ -130,3 +130,32 @@ class Discriminator(nn.Module):
 
     def forward(self, img):
         return self.model(img)
+
+
+class AttnDiscriminator(nn.Module):
+    def __init__(self, input_shape):
+        super(AttnDiscriminator, self).__init__()
+        channels, height, width = input_shape
+        self.mask_shape = height
+        self.output_shape = (1, height // 2 ** 3, width // 2 ** 3)
+
+        self.model = nn.Sequential(
+            DisBlock(channels, 64, normalize=False),
+            DisBlock(64, 128),
+            DisBlock(128, 256)
+        )
+
+        self.fin = nn.Conv2d(256, 1, 1)
+
+    def forward(self, img):
+        inter = self.model(img)
+        expand_mask = self._mask_rescale(inter)
+        fin = self.fin(inter)
+        return fin, expand_mask
+
+    def _mask_rescale(self, mask_tensor):
+        mask_tensor = torch.mean(abs(mask_tensor), dim=1).unsqueeze(1)
+        t_max, t_min = torch.max(mask_tensor), torch.min(mask_tensor)
+        mask_tensor = (mask_tensor - t_min) / (t_max - t_min)
+        return func.interpolate(mask_tensor, (self.mask_shape, self.mask_shape), mode='bilinear')
+
